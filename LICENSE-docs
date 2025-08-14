@@ -1,0 +1,58 @@
+Documentation & Prompts License (CC BY 4.0)
+Taiko Community Alliance – Taiko Quest
+Last updated: August 13, 2025
+
+SUMMARY
+Except where otherwise noted, the written materials in this repository — including documentation,
+setup guides, and the bingo prompts dataset — are licensed under the Creative Commons Attribution
+4.0 International (CC BY 4.0) license. You may copy, share, and adapt this material for any purpose,
+even commercially, provided you give appropriate credit and indicate if changes were made.
+No additional restrictions may be applied.
+
+FULL LICENSE
+Human-readable summary: https://creativecommons.org/licenses/by/4.0/
+Legal code:            https://creativecommons.org/licenses/by/4.0/legalcode
+
+SCOPE OF THIS LICENSE
+Covered by CC BY 4.0:
+- Documentation (README, guides, docs pages, admin/user instructions).
+- Non-code content in this repo (e.g., bingo prompts in text/CSV/JSON).
+- Screenshots of the app UI that do not include third-party marks or TCA brand assets.
+
+Not covered here (see respective terms):
+- Source code: Licensed separately in LICENSE (see repository root).
+- Brand assets: Logos/wordmarks in assets/brand/ are All Rights Reserved by Taiko Community Alliance.
+- Attendee uploads (photos/videos): Governed by TERMS.md (media consent).
+- Third-party content (e.g., vendor logos, stock images, fonts) used under their own licenses —
+  see file-level notices if included.
+
+PREFERRED ATTRIBUTION
+Short form (web/pages):
+“© 2025 Taiko Community Alliance (TCA). Documentation & prompts licensed under CC BY 4.0. https://github.com/Taiko-Community-Alliance/Taiko-Quest-NATC-Phoenix-2025”
+
+Long form (publications/derivatives):
+“This work, ‘TCA Conference Bingo Documentation and Prompts,’ is © 2025 Taiko Community Alliance (TCA)
+and licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0). Changes were made from the
+original. Source: https://github.com/Taiko-Community-Alliance/Taiko-Quest-NATC-Phoenix-2025”
+
+MARKING CHANGES
+If you remix, transform, or build upon this material, indicate what you changed (e.g.,
+“Adapted prompts list: added 8 items, removed 3 items”) and keep a change log where practical.
+
+NO ENDORSEMENT
+Attribution does not imply TCA’s endorsement of you or your use.
+
+TRADEMARKS & BRANDING
+“TCA,” “Taiko Community Alliance,” logos, and other brand assets are trademarks/marks of Taiko Community Alliance and
+are not licensed here. Do not reuse brand assets without prior written permission.
+
+INTERPLAY WITH CODE EXAMPLES
+If a documentation file contains code blocks or example snippets, those snippets are licensed under the repository’s
+code license (see LICENSE), unless the snippet is explicitly marked as CC BY 4.0.
+
+THIRD-PARTY CONTENT
+Any third-party materials included here retain their original licenses. If a file includes third-party content,
+a file-level note should indicate its license/attribution.
+
+CONTACT
+Questions about this license or permissions: info@taikocommunityalliance.org
