@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Access My Board · Taiko Quest NATC Phoenix 2025</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="./config.js"></script>
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+    const { SUPABASE_URL, SUPABASE_KEY } = window.__ENV || {}
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+    async function signIn(e){
+      e.preventDefault()
+      const email=e.target.email.value.trim()
+      if(!email) return alert('Email required')
+      
+      const location = window.location
+      const redirectBase = `${location.origin}${location.pathname}${location.search}`
+      log.info('signin clicked; redirectTo', redirectBase)
+      const { error } = await supabase.auth.signInWithOtp({ email, options:{ emailRedirectTo: redirectBase } })
+      if(error) return alert('Error: '+error.message)
+      document.getElementById('msg').textContent='Check your email for the sign-in link.'
+    }
+
+    async function afterLogin(){
+      const { data:{ user } } = await supabase.auth.getUser()
+      if(!user) return
+      // upsert profile
+      await supabase.from('profiles').upsert({ id:user.id, email:user.email, display_name:user.user_metadata?.full_name||'' }, { onConflict:'id' })
+      // consent (simple modal)
+      const { data: prof } = await supabase.from('profiles').select('consent,approved').eq('id', user.id).single()
+      if(!prof.consent){
+        document.getElementById('consentWrap').classList.remove('hidden')
+        return
+      }
+      await proceedGate(user, prof)
+    }
+
+    async function agreeConsent(){
+      const { data:{ user } } = await supabase.auth.getUser()
+      await supabase.from('profiles').update({ consent:true }).eq('id', user.id)
+      const { data: prof } = await supabase.from('profiles').select('consent,approved').eq('id', user.id).single()
+      await proceedGate(user, prof)
+    }
+
+    async function proceedGate(user, prof){
+      const { data: reg } = await supabase.from('registrations').select('status').eq('email', user.email).maybeSingle()
+      if(!reg || reg.status!=='approved'){
+        document.getElementById('state').textContent='Pending approval. Please check back later.'
+        return
+      }
+      if(!prof.approved){ await supabase.from('profiles').update({ approved:true }).eq('id', user.id) }
+      // go to board
+      location.href = './board.html'
+    }
+
+    // boot
+    supabase.auth.getUser().then(({data:{user}})=>{ if(user) afterLogin() })
+    window.signIn=signIn
+    window.agreeConsent=agreeConsent
+  </script>
+</head>
+<body class="h-full">
+  <main class="max-w-md mx-auto p-6">
+    <h1 class="text-2xl font-semibold mb-4">Access My Board</h1>
+    <form class="space-y-3" onsubmit="signIn(event)">
+      <div><label class="block text-sm">Email</label>
+        <input name="email" type="email" class="w-full rounded-xl border p-2.5" /></div>
+      <button class="w-full rounded-xl bg-gray-900 text-white py-2.5">Send magic link</button>
+    </form>
+    <p id="msg" class="text-sm text-gray-600 mt-3"></p>
+    <p id="state" class="text-sm text-gray-800 mt-3"></p>
+
+    <!-- Consent modal -->
+    <div id="consentWrap" class="hidden fixed inset-0 bg-black/40 grid place-items-center p-4">
+      <div class="bg-white rounded-2xl p-5 max-w-lg w-full">
+        <h2 class="text-lg font-semibold mb-2">Media Consent</h2>
+        <p class="text-sm text-gray-700">I agree that TCA may use photos/videos I submit for media purposes as described in the Terms.</p>
+        <div class="mt-4 flex gap-2">
+          <button onclick="agreeConsent()" class="px-4 py-2 rounded-xl bg-gray-900 text-white">I Agree</button>
+          <a href="./TERMS.html" class="px-4 py-2 rounded-xl bg-gray-100">Read Terms</a>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

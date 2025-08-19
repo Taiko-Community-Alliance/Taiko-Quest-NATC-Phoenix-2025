@@ -1,0 +1,51 @@
+name: Build & Deploy Pages
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Stage your /docs folder as the site
+      - name: Stage site
+        run: |
+          mkdir -p dist/docs
+          cp -R docs/* dist/docs/
+
+      # Create runtime config from repo secrets (no commit to git)
+      - name: Write config.js
+        run: |
+          cat > dist/docs/config.js <<'EOF'
+          window.__ENV = {
+            SUPABASE_URL: "${{ secrets.SUPABASE_URL }}",
+            SUPABASE_KEY: "${{ secrets.SUPABASE_KEY }}"
+          };
+          EOF
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/deploy-pages@v4
+        with:
+          preview: ${{ github.ref != 'refs/heads/main' }}

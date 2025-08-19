@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>My Board · Taiko Quest NATC Phoenix 2025</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="./config.js"></script>
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+    const { SUPABASE_URL, SUPABASE_KEY } = window.__ENV || {}
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+    const grid = document.getElementById('grid'), hdr = document.getElementById('hdr')
+
+    async function boot(){
+      const { data:{ user } } = await supabase.auth.getUser()
+      if(!user) return location.href='./access.html'
+      hdr.textContent = user.email
+      // gate: approved + consent
+      const { data: p } = await supabase.from('profiles').select('approved,consent').eq('id', user.id).single()
+      if(!p?.consent) return location.href='./access.html'
+      if(!p?.approved) { grid.innerHTML='<p>Pending approval.</p>'; return }
+      // board
+      const board = await ensureBoard(user.id)
+      await renderBoard(board.id)
+    }
+
+    async function ensureBoard(uid){
+      const { data: b } = await supabase.from('quest_boards').select('id').eq('user_id', uid).maybeSingle()
+      if(b) return b
+      // create new board
+      const { data: qs } = await supabase.from('questions').select('id,text').eq('active', true)
+      const selected = (qs||[]).sort(()=>Math.random()-0.5).slice(0,25)
+      const { data: [board] } = await supabase.from('quest_boards').insert({ user_id: uid }).select()
+      await supabase.from('board_items').insert(selected.map(q=>({ board_id: board.id, question_id: q.id })))
+      return board
+    }
+
+    async function renderBoard(boardId){
+      const { data: items } = await supabase
+        .from('board_items')
+        .select('id, proof_url, verified, questions(text)')
+        .eq('board_id', boardId)
+      grid.innerHTML = ''
+      items.forEach((it,i)=>{
+        const cell = document.createElement('div')
+        cell.className = 'bg-white rounded-xl p-3 shadow ring-1 ring-black/5 flex flex-col justify-between'
+        cell.innerHTML = `
+          <div class="text-sm text-gray-800">${it.questions.text}</div>
+          <div class="mt-2 space-y-2">
+            ${it.proof_url ? `<a href="${it.proof_url}" target="_blank" class="text-xs underline break-all">View proof</a>` : ''}
+            <div class="flex items-center gap-2">
+              <input type="file" accept="image/*,video/*" data-id="${it.id}" class="text-xs" />
+              ${it.verified ? '<span class="text-emerald-700 text-xs">Verified ✓</span>' : it.proof_url ? '<span class="text-gray-600 text-xs">Submitted</span>' : ''}
+            </div>
+          </div>`
+        grid.appendChild(cell)
+      })
+      grid.querySelectorAll('input[type=file]').forEach(inp=>{
+        inp.addEventListener('change', (e)=> handleUpload(e, boardId))
+      })
+    }
+
+    async function handleUpload(e, boardId){
+      const file = e.target.files?.[0]
+      if(!file) return
+      const itemId = e.target.dataset.id
+      // basic caps (UI): photos ≤ 2MB, videos ≤ 10MB
+      const isVideo = file.type.startsWith('video/')
+      const max = isVideo ? 10*1024*1024 : 2*1024*1024
+      if(file.size > max) { alert(`File too large. Max ${isVideo?'10MB video':'2MB photo'}.`); return }
+
+      const { data:{ user } } = await supabase.auth.getUser()
+      const ext = file.name.split('.').pop() || (isVideo?'mp4':'jpg')
+      const path = `${user.id}/${itemId}/${Date.now()}.${ext}`
+
+      // upload to bucket
+      const { error: upErr } = await supabase.storage.from('proofs').upload(path, file, { upsert:true })
+      if(upErr) return alert('Upload failed: '+upErr.message)
+
+      // get public URL & save to row
+      const { data:pub } = supabase.storage.from('proofs').getPublicUrl(path)
+      const { error: dbErr } = await supabase.from('board_items').update({ proof_url: pub.publicUrl }).eq('id', itemId)
+      if(dbErr) return alert('Save failed: '+dbErr.message)
+
+      // refresh
+      await renderBoard(boardId)
+    }
+
+    boot()
+  </script>
+</head>
+<body class="h-full">
+  <main class="max-w-6xl mx-auto p-4 sm:p-6">
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-semibold">My Board</h1>
+      <div class="text-sm text-gray-600">Signed in as <span id="hdr"></span></div>
+    </div>
+    <div id="grid" class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3"></div>
+  </main>
+</body>
+</html>
