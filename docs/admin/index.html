@@ -110,4 +110,81 @@
     const whoami = document.getElementById('whoami')
     const nav = document.getElementById('nav')
     const signin = document.getElementById('signin')
-    const signout = document.getElementById('sign
+    const signout = document.getElementById('signout')
+    const signin2 = document.getElementById('signin2')
+    const signedOut = document.getElementById('signedOut')
+    const noAccess = document.getElementById('noAccess')
+    const cards = document.getElementById('cards')
+    const badgeUnv = document.getElementById('badgeUnv')
+    const badgePending = document.getElementById('badgePending')
+
+    // hook buttons
+    const doSignIn = () => signInGoogle(supabase)
+    signin.onclick = doSignIn
+    if (signin2) signin2.onclick = doSignIn
+    signout.onclick = () => signOut(supabase)
+
+    async function boot() {
+      const guard = await requireAdmin(supabase, ADMIN_DOMAIN, { signinBtn: signin, signoutBtn: signout, whoami })
+      // Header: when not logged in, show only Sign in (admin-common already toggles)
+      const { data:{ user } } = await supabase.auth.getUser()
+      const loggedIn = !!user
+
+      // Default UI
+      signedOut.classList.toggle('hidden', loggedIn)
+      whoami.classList.toggle('hidden', !loggedIn)
+
+      if (!loggedIn) {
+        nav.classList.add('hidden')
+        cards.classList.add('hidden')
+        noAccess.classList.add('hidden')
+        return
+      }
+
+      if (!guard.admin) {
+        // Logged in but not admin
+        nav.classList.add('hidden')
+        cards.classList.add('hidden')
+        noAccess.classList.remove('hidden')
+        return
+      }
+
+      // Admin view
+      nav.classList.remove('hidden')
+      cards.classList.remove('hidden')
+      noAccess.classList.add('hidden')
+      signedOut.classList.add('hidden')
+
+      // Load little badges (counts)
+      await loadBadges()
+    }
+
+    async function loadBadges() {
+      // Pending registrations
+      const { count: regCount } = await supabase
+        .from('registrations')
+        .select('id', { count:'exact', head:true })
+        .eq('status','pending')
+      if (regCount > 0) {
+        badgePending.textContent = `${regCount} pending`
+        badgePending.classList.remove('hidden')
+      } else {
+        badgePending.classList.add('hidden')
+      }
+
+      // Unverified items (via view)
+      const { count: unvCount } = await supabase
+        .from('v_unverified_items')
+        .select('id', { count:'exact', head:true })
+      if (unvCount > 0) {
+        badgeUnv.textContent = `${unvCount} to verify`
+        badgeUnv.classList.remove('hidden')
+      } else {
+        badgeUnv.classList.add('hidden')
+      }
+    }
+
+    boot()
+  </script>
+</body>
+</html>
