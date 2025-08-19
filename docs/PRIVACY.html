@@ -6,20 +6,59 @@
   <title>Privacy Notice · Taiko Quest NATC Phoenix 2025</title>
   <meta name="color-scheme" content="light only">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            'title': ['"ITC Officina Sans"', '"Fira Sans"', 'sans-serif'],
+            'body': ['"Trade Gothic Condensed"', '"Helvetica Neue"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@600&display=swap" rel="stylesheet">
   <style>
+    @font-face {
+      font-family: 'Helvetica Neue';
+      src: url('https://fonts.cdnfonts.com/css/helvetica-neue-9');
+      font-weight: 300;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Helvetica Neue';
+      src: url('https://fonts.cdnfonts.com/css/helvetica-neue-9');
+      font-weight: 700;
+      font-style: normal;
+    }
     .prose h2 { margin-top: 1.25rem }
     .prose h3 { margin-top: 1rem }
   </style>
 </head>
-<body class="h-full">
-  <main class="max-w-3xl mx-auto p-5 sm:p-8">
-    <header class="mb-6">
-      <h1 class="text-3xl font-semibold text-gray-900">Privacy Notice</h1>
-      <p class="text-sm text-gray-600">Taiko Quest NATC Phoenix 2025 • Taiko Community Alliance (TCA)</p>
-      <p class="text-xs text-gray-500 mt-1">Last updated: August 18, 2025</p>
-    </header>
+<body class="min-h-screen bg-gray-50">
+  <header class="bg-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+      <div class="flex items-center">
+        <img src="./assets/brand/TCA-Logo.png" alt="TCA Logo" class="h-10 w-auto">
+        <h1 class="ml-3 text-xl sm:text-2xl font-bold font-title">Taiko Quest</h1>
+      </div>
+      <p class="text-sm text-gray-500 font-body">NATC Phoenix 2025</p>
+    </div>
+  </header>
 
-    <article class="prose prose-sm max-w-none text-gray-800">
+  <main class="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 mt-4">
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+      <header class="mb-6">
+        <h2 class="text-2xl sm:text-3xl font-bold font-title text-gray-900">Privacy Notice</h2>
+        <p class="text-sm text-gray-600 font-body mt-2">Taiko Quest NATC Phoenix 2025 • Taiko Community Alliance (TCA)</p>
+        <p class="text-xs text-gray-500 font-body mt-1">Last updated: August 18, 2025</p>
+      </header>
+    </div>
+
+    <article class="prose prose-sm max-w-none text-gray-800 font-body bg-white rounded-xl shadow-sm p-6">
       <p>
         This Privacy Notice explains how Taiko Community Alliance (“TCA”, “we”, “our”) collects, uses, and shares
         information when you use the Taiko Quest NATC Phoenix 2025 website and related pages (the “Service”).
@@ -120,11 +159,14 @@
       </p>
     </article>
 
-    <footer class="mt-10 text-xs text-gray-500">
-      © <span id="year"></span> Taiko Community Alliance. All Rights Reserved.
-      <span class="mx-2">•</span>
-      <a class="underline" href="./TERMS.html">Terms of Use</a>
-    </footer>
+    <div class="text-center mt-8">
+      <a href="./index.html" class="text-sm text-gray-600 hover:text-gray-900 font-body">← Back to Home</a>
+      <footer class="mt-6 text-xs text-gray-500 font-body">
+        © <span id="year"></span> Taiko Community Alliance. All Rights Reserved.
+        <span class="mx-2">•</span>
+        <a class="hover:underline text-gray-700" href="./TERMS.html">Terms of Use</a>
+      </footer>
+    </div>
   </main>
 
   <script>

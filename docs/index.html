@@ -2,20 +2,73 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Taiko Quest NATC Phoenix 2025</title>
-    <style src="https://cdn.tailwindcss.com"></style>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'title': ['"ITC Officina Sans"', '"Fira Sans"', 'sans-serif'],
+                        'body': ['"Trade Gothic Condensed"', '"Helvetica Neue"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@600&display=swap" rel="stylesheet">
+    <style>
+        @font-face {
+            font-family: 'Helvetica Neue';
+            src: url('https://fonts.cdnfonts.com/css/helvetica-neue-9');
+            font-weight: 300;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'Helvetica Neue';
+            src: url('https://fonts.cdnfonts.com/css/helvetica-neue-9');
+            font-weight: 700;
+            font-style: normal;
+        }
+    </style>
 </head>
-<body class="h-full">
-    <main class="max-w-xl mx-auto p-6">
-    <h1 class="text-3xl font-semibold">Taiko Quest NATC Phoenix 2025</h1>
-    <p class="text-gray-600 mt-1 text-sm">Presented by Taiko Community Alliance</p>
+<body class="min-h-screen bg-gray-50">
+    <header class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+            <div class="flex items-center">
+                <img src="https://via.placeholder.com/50x50?text=Logo" alt="Taiko Quest Logo" class="h-10 w-auto">
+                <h1 class="ml-3 text-xl sm:text-2xl font-bold font-title">Taiko Quest</h1>
+            </div>
+            <p class="text-sm text-gray-500 font-body">NATC Phoenix 2025</p>
+        </div>
+    </header>
 
-    <div class="mt-6 space-y-3">
-      <a href="./request.html" class="block p-4 rounded-2xl bg-white ring-1 ring-black/5 hover:bg-gray-50">Request Access</a>
-      <a href="./access.html" class="block p-4 rounded-2xl bg-white ring-1 ring-black/5 hover:bg-gray-50">Access My Board</a>
-      <a href="./admin/questions.html" class="block p-4 rounded-2xl bg-white ring-1 ring-black/5 hover:bg-gray-50">Admin · Questions</a>
-      <a href="./admin/people.html" class="block p-4 rounded-2xl bg-white ring-1 ring-black/5 hover:bg-gray-50">Admin · People</a>
-      <a href="./admin/verifications.html" class="block p-4 rounded-2xl bg-white ring-1 ring-black/5 hover:bg-gray-50">Admin · Verifications</a>
-    </div>
+    <main class="max-w-xl mx-auto p-4 sm:p-6 mt-4">
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+            <h2 class="text-2xl sm:text-3xl font-bold font-title text-gray-900">Welcome to Taiko Quest</h2>
+            <p class="text-gray-600 mt-2 font-body">Presented by Taiko Community Alliance</p>
+        </div>
+
+        <div class="mt-6 space-y-3">
+            <a href="./request.html" class="block p-4 rounded-lg sm:rounded-2xl bg-white shadow-sm hover:bg-gray-50 transition-colors font-body text-center sm:text-left">
+                <span class="font-bold">Request Access</span>
+            </a>
+            <a href="./access.html" class="block p-4 rounded-lg sm:rounded-2xl bg-white shadow-sm hover:bg-gray-50 transition-colors font-body text-center sm:text-left">
+                <span class="font-bold">Access My Board</span>
+            </a>
+            <a href="./admin/questions.html" class="block p-4 rounded-lg sm:rounded-2xl bg-white shadow-sm hover:bg-gray-50 transition-colors font-body text-center sm:text-left">
+                <span class="font-bold">Admin · Questions</span>
+            </a>
+            <a href="./admin/people.html" class="block p-4 rounded-lg sm:rounded-2xl bg-white shadow-sm hover:bg-gray-50 transition-colors font-body text-center sm:text-left">
+                <span class="font-bold">Admin · People</span>
+            </a>
+            <a href="./admin/verifications.html" class="block p-4 rounded-lg sm:rounded-2xl bg-white shadow-sm hover:bg-gray-50 transition-colors font-body text-center sm:text-left">
+                <span class="font-bold">Admin · Verifications</span>
+            </a>
+        </div>
+    </main>
 </body>
 </html>
