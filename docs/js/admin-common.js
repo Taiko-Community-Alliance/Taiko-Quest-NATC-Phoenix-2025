@@ -18,7 +18,7 @@ export function updateAuthUI(user, els) {
   const loggedIn = !!user
   if (signinBtn)  signinBtn.classList.toggle('hidden', loggedIn)
   if (signoutBtn) signoutBtn.classList.toggle('hidden', !loggedIn)
-  if (whoami)     whoami.textContent = loggedIn ? `Signed in as ${user.email}` : 'Not signed in'
+  if (whoami)     whoami.textContent = loggedIn ? `Signed in as ${user.display_name}` : 'Not signed in'
 }
 
 export async function requireAdmin(supabase, ADMIN_DOMAIN, els) {
