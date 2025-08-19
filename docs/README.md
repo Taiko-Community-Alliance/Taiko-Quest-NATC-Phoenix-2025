@@ -25,3 +25,11 @@ Welcome to the documentation for the **NATC (North American Taiko Conference) Ph
 - **Docs & prompts:** **CC BY 4.0** (see `LICENSE-docs`)
 - **Brand assets:** **All Rights Reserved**
 - **Attendee uploads:** **TERMS.md** (media consent)
+
+## How to run in local machine (Ex in Ubuntu)
+### Using node http-server
+npx http-server docs -p 8000 -a 0.0.0.0 --cors
+
+### Using Python 3
+cd docs
+python3 -m http.server 8000 --bind 0.0.0.0

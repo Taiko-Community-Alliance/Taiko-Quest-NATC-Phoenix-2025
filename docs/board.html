@@ -5,14 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Quest Board · Taiko Quest NATC Phoenix 2025</title>
   <meta name="color-scheme" content="light only">
-
-  <!-- Tailwind (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Runtime config (GENERATED; do not commit) -->
   <script src="./config.js"></script>
-
-  <!-- html2canvas for export -->
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </head>
 <body class="h-full">
@@ -28,7 +22,6 @@
       </div>
     </header>
 
-    <!-- Status / actions -->
     <section class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div class="text-sm">
         <span id="progress" class="font-medium">0/25 submitted</span>
@@ -40,24 +33,20 @@
       </div>
     </section>
 
-    <!-- Board -->
     <section id="boardWrap" class="mt-4">
-      <div id="grid"
-           class="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        <!-- cells injected -->
-      </div>
+      <div id="grid" class="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3"></div>
       <p id="note" class="text-xs text-gray-500 mt-2">
         Tip: Photos up to 2 MB, videos up to 10 MB. A coordinator will mark items as Verified ✓.
       </p>
     </section>
 
-    <!-- Pending/consent gate -->
     <section id="gate" class="mt-6 hidden">
       <div class="bg-amber-50 text-amber-900 ring-1 ring-amber-200 rounded-2xl p-4">
         <p id="gateMsg" class="text-sm"></p>
         <div id="consentBtns" class="mt-3 hidden">
           <button id="agreeBtn" class="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">I Agree</button>
           <a href="./TERMS.html" class="px-3 py-2 rounded-lg bg-gray-100 text-sm">Read Terms</a>
+          <a href="./PRIVACY.html" class="px-3 py-2 rounded-lg bg-gray-100 text-sm">Privacy</a>
         </div>
       </div>
     </section>
@@ -80,8 +69,6 @@
     const gateMsg = document.getElementById('gateMsg')
     const consentBtns = document.getElementById('consentBtns')
     const agreeBtn = document.getElementById('agreeBtn')
-
-    let currentBoardId = null
 
     signout.onclick = async () => { await supabase.auth.signOut(); location.href = './access.html' }
 
@@ -109,61 +96,43 @@
         return
       }
 
-      // Ensure board exists, then render
       const board = await ensureBoard(user.id)
-      currentBoardId = board.id
       await renderBoard(board.id)
     })
 
-    // Ensure a quest board exists for this user; create if not
     async function ensureBoard(uid) {
-      const { data: b, error: bErr } = await supabase
-        .from('quest_boards').select('id').eq('user_id', uid).maybeSingle()
+      const { data: b, error: bErr } = await supabase.from('quest_boards').select('id').eq('user_id', uid).maybeSingle()
       if (bErr) throw bErr
       if (b) return b
 
-      // level-balanced selection with fallback
       const LEVEL_TARGETS = { easy: 13, medium: 9, hard: 3 }
-
-      const { data: allQs, error: qErr } = await supabase
-        .from('questions')
-        .select('id, level, text')
-        .eq('active', true)
+      const { data: allQs, error: qErr } = await supabase.from('questions').select('id, level, text').eq('active', true)
       if (qErr) throw qErr
       if (!allQs?.length) throw new Error('No active questions found.')
 
       const byLevel = { easy: [], medium: [], hard: [] }
       for (const q of allQs) (byLevel[q.level] || (byLevel[q.level] = [])).push(q)
+      function pick(arr, n) { const a = arr.slice(); for (let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]} return a.slice(0,n) }
 
-      function pick(arr, n) {
-        const a = arr.slice()
-        for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]] }
-        return a.slice(0, n)
-      }
-
-      // First pass: pick up to targets per level
       let selected = []
       for (const lvl of ['easy','medium','hard']) {
         const want = LEVEL_TARGETS[lvl]
         const got = Math.min(want, byLevel[lvl]?.length || 0)
         selected = selected.concat(pick(byLevel[lvl] || [], got))
       }
-      // Top-up to 25 from remaining pool
       if (selected.length < 25) {
         const remaining = allQs.filter(q => !selected.some(s => s.id === q.id))
         selected = selected.concat(pick(remaining, Math.max(0, 25 - selected.length)))
       }
       selected = selected.slice(0, 25)
 
-      const { data: insertedBoards, error: iErr } = await supabase
-        .from('quest_boards').insert({ user_id: uid }).select()
+      const { data: insertedBoards, error: iErr } = await supabase.from('quest_boards').insert({ user_id: uid }).select()
       if (iErr) throw iErr
       const board = insertedBoards[0]
 
       const items = selected.map(q => ({ board_id: board.id, question_id: q.id }))
       const { error: biErr } = await supabase.from('board_items').insert(items)
       if (biErr) throw biErr
-
       return board
     }
 
@@ -174,13 +143,11 @@
         .eq('board_id', boardId)
       if (error) { grid.innerHTML = errorCard(error.message); return }
 
-      // Progress
       const submitted = items.filter(it => !!it.proof_url).length
-      const verified = items.filter(it => !!it.verified).length
+      const verified  = items.filter(it => !!it.verified).length
       progressEl.textContent = `${submitted}/25 submitted`
       verifiedEl.textContent = `${verified} verified`
 
-      // Render cells
       grid.innerHTML = ''
       items.forEach((it, idx) => {
         const cell = document.createElement('div')
@@ -189,10 +156,7 @@
           <div class="text-xs text-gray-500">#${idx+1}</div>
           <div class="text-sm text-gray-900">${escapeHtml(it.questions?.text || '')}</div>
           <div class="flex items-center gap-2 mt-1">
-            ${it.proof_url
-              ? `<a href="${it.proof_url}" target="_blank" class="text-xs underline break-all">View proof</a>`
-              : `<span class="text-xs text-gray-500">No proof yet</span>`
-            }
+            ${it.proof_url ? `<a href="${it.proof_url}" target="_blank" class="text-xs underline break-all">View proof</a>` : `<span class="text-xs text-gray-500">No proof yet</span>`}
             ${it.verified ? `<span class="ml-auto text-xs text-emerald-700">Verified ✓</span>` : ''}
           </div>
           <div class="flex items-center justify-between gap-2">
@@ -203,15 +167,19 @@
         grid.appendChild(cell)
       })
 
-      // Wire uploads
       grid.querySelectorAll('.btn-upload').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           const id = e.currentTarget.dataset.id
           const inp = grid.querySelector(`input[type=file][data-id="${id}"]`)
           const file = inp?.files?.[0]
           if (!file) { alert('Choose a file first.'); return }
-          await handleUpload(id, file)
-          await renderBoard(boardId)
+          btn.disabled = true; btn.textContent = 'Uploading…'
+          try {
+            await handleUpload(id, file)
+            await renderBoard(boardId)
+          } finally {
+            btn.disabled = false; btn.textContent = 'Upload'
+          }
         })
       })
     }
@@ -219,10 +187,7 @@
     async function handleUpload(itemId, file) {
       const isVideo = file.type.startsWith('video/')
       const max = isVideo ? 10 * 1024 * 1024 : 2 * 1024 * 1024
-      if (file.size > max) {
-        alert(`File too large. Max ${isVideo ? '10MB video' : '2MB photo'}.`)
-        return
-      }
+      if (file.size > max) { alert(`File too large. Max ${isVideo ? '10MB video' : '2MB photo'}.`); return }
       const { data:{ user } } = await supabase.auth.getUser()
       const ext = (file.name.split('.').pop() || (isVideo ? 'mp4' : 'jpg')).toLowerCase().replace(/[^\w]/g,'')
       const path = `${user.id}/${itemId}/${Date.now()}.${ext}`
@@ -235,24 +200,15 @@
       if (saveErr) { alert('Save failed: ' + saveErr.message) }
     }
 
-    // Export board to image (downloads PNG)
     exportBtn.onclick = async () => {
       exportBtn.disabled = true
       try {
         const canvas = await html2canvas(document.getElementById('grid'), { backgroundColor: '#ffffff', scale: 2 })
         const url = canvas.toDataURL('image/png')
-        const a = document.createElement('a')
-        a.href = url
-        a.download = 'taiko-quest-board.png'
-        a.click()
-      } catch (e) {
-        alert('Export failed.')
-      } finally {
-        exportBtn.disabled = false
-      }
+        const a = document.createElement('a'); a.href = url; a.download = 'taiko-quest-board.png'; a.click()
+      } catch { alert('Export failed.') } finally { exportBtn.disabled = false }
     }
 
-    // Share (when supported)
     shareBtn.onclick = async () => {
       try {
         const canvas = await html2canvas(document.getElementById('grid'), { backgroundColor: '#ffffff', scale: 2 })
@@ -261,17 +217,9 @@
           const file = new File([blob], 'taiko-quest-board.png', { type: 'image/png' })
           await navigator.share({ files: [file], title: 'My Taiko Quest Board' })
         } else {
-          // Fallback: download
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url
-          a.download = 'taiko-quest-board.png'
-          a.click()
-          URL.revokeObjectURL(url)
+          const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'taiko-quest-board.png'; a.click(); URL.revokeObjectURL(url)
         }
-      } catch (e) {
-        alert('Share failed.')
-      }
+      } catch { alert('Share failed.') }
     }
 
     function errorCard(msg) {
