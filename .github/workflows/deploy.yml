@@ -1,5 +1,4 @@
 name: Build & Deploy Pages
-
 on:
   push:
     branches: [ main ]
@@ -18,59 +17,43 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4   # no ref override
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
-      # Install dev deps (tailwindcss) from package.json
-      - name: Install dependencies
-        run: npm ci
-
-      # Build Tailwind straight into the dist/docs folder
-      - name: Build Tailwind CSS
-        env:
-          NODE_ENV: production
+      # Build Tailwind: input in src/styles/tailwind.css → output to docs/assets/tailwind.css
+      - name: Build CSS
         run: |
-          mkdir -p dist/docs/assets
-          npx tailwindcss -c tailwind.config.js \
-            -i src/styles/tailwind.css \
-            -o dist/docs/assets/tailwind.css \
-            --minify
+          mkdir -p docs/assets
+          npx --yes tailwindcss -i ./src/styles/tailwind.css -o ./docs/assets/tailwind.css --minify
 
-      # Stage the rest of the site (HTML/JS/assets from docs)
-      - name: Stage site files
+      # Stage site to dist/ (site root = dist/)
+      - name: Stage site
         run: |
-          mkdir -p dist/docs
-          cp -R docs/* dist/docs/
+          rm -rf dist
+          mkdir -p dist
+          cp -R docs/* dist/
 
-      # Create runtime config from repo secrets (not committed)
+      # Runtime config (NOT committed)
       - name: Write config.js
         run: |
-          cat > dist/docs/config.js <<'EOF'
+          cat > dist/config.js <<'EOF'
           window.__ENV = {
             SUPABASE_URL: "${{ secrets.SUPABASE_URL }}",
             SUPABASE_KEY: "${{ secrets.SUPABASE_KEY }}"
           };
           EOF
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v4
