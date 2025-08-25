@@ -9,44 +9,7 @@
 </head>
 <body class="h-full">
   <div class="max-w-6xl mx-auto p-4 sm:p-6">
-    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-      <div>
-        <div class="flex items-center justify-between">
-          <h1 class="text-2xl sm:text-3xl font-semibold text-gray-900">Admin · People</h1>
-          <!-- Hamburger menu button (visible only on mobile) -->
-          <button id="menuBtn" class="sm:hidden p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-        </div>
-        <p class="text-sm text-gray-600 break-all">Approve requests, promote/demote admins.</p>
-
-        <!-- Mobile menu (hidden by default on mobile, always hidden on desktop) -->
-        <div id="mobileMenu" class="sm:hidden hidden mt-3 p-3 bg-gray-50 rounded-lg shadow-sm">
-          <div class="flex flex-col space-y-3">
-            <div class="text-sm text-gray-600 break-all">
-              Signed in as: <span id="whoami">Checking session…</span>
-            </div>
-            <div class="flex flex-col space-y-2">
-              <a href="./questions.html" class="px-3 py-2 rounded-lg bg-gray-100 text-sm text-center">Questions</a>
-              <a href="./verifications.html" class="px-3 py-2 rounded-lg bg-gray-100 text-sm text-center">Verifications</a>
-              <button id="signin" class="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">Sign in</button>
-              <button id="signout" class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 text-sm">Sign out</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Desktop view (hidden on mobile, visible on desktop) -->
-      <div class="hidden sm:flex sm:items-center sm:gap-2">
-        <span id="whoami-desktop" class="text-sm text-gray-600 break-all">Checking session…</span>
-        <a href="./questions.html" class="px-3 py-2 rounded-lg bg-gray-100 text-sm">Questions</a>
-        <a href="./verifications.html" class="px-3 py-2 rounded-lg bg-gray-100 text-sm">Verifications</a>
-        <button id="signin-desktop" class="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">Sign in</button>
-        <button id="signout-desktop" class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 text-sm">Sign out</button>
-      </div>
-    </header>
+    <div id="siteHeader"></div>
 
     <section id="content" class="hidden space-y-6">
       <!-- Pending registrations -->
@@ -73,7 +36,21 @@
   </div>
 
   <script type="module">
+    import { renderHeader, initHeader } from '../js/header.js'
     import { supaFromConfig, requireAdmin, updateAuthUI, signInGoogle, signOut } from '../js/admin-common.js'
+    
+    document.getElementById('siteHeader').outerHTML = renderHeader({
+        admin: true,
+        nav: [
+            ['Admin', './index.html'],
+            ['Questions', './questions.html'],
+            ['Verifications', './verifications.html'],
+            // ['Reports', './reports.html'], --- IGNORE ---
+        ],
+        withAuth: true,
+    })
+    initHeader()
+
     const supabase = supaFromConfig()
     const ADMIN_DOMAIN = '@taikocommunityalliance.org'
 
@@ -81,11 +58,6 @@
     const whoami = document.getElementById('whoami')
     const signin = document.getElementById('signin')
     const signout = document.getElementById('signout')
-
-    // Desktop elements
-    const whoamiDesktop = document.getElementById('whoami-desktop')
-    const signinDesktop = document.getElementById('signin-desktop')
-    const signoutDesktop = document.getElementById('signout-desktop')
 
     // Common elements
     const menuBtn = document.getElementById('menuBtn')
@@ -102,29 +74,15 @@
       mobileMenu.classList.toggle('hidden')
     })
 
-    // Sign in/out functionality for both mobile and desktop buttons
     const handleSignIn = () => signInGoogle(supabase)
     const handleSignOut = () => signOut(supabase)
 
     signin.onclick = handleSignIn
     signout.onclick = handleSignOut
-    signinDesktop.onclick = handleSignIn
-    signoutDesktop.onclick = handleSignOut
 
     async function boot() {
       // For mobile view
       const guard = await requireAdmin(supabase, ADMIN_DOMAIN, { signinBtn: signin, signoutBtn: signout, whoami })
-
-      // For desktop view - manually update the UI elements
-      if (guard.user) {
-        whoamiDesktop.textContent = guard.user.email
-        signinDesktop.classList.add('hidden')
-        signoutDesktop.classList.remove('hidden')
-      } else {
-        whoamiDesktop.textContent = 'Not signed in'
-        signinDesktop.classList.remove('hidden')
-        signoutDesktop.classList.add('hidden')
-      }
 
       if (!guard.admin) return
       content.classList.remove('hidden')

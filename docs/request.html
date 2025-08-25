@@ -3,94 +3,73 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Taiko Quest NATC Phoenix 2025 · Request Access</title>
+  <title>Request Access · Taiko Quest NATC Phoenix 2025</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            'title': ['"ITC Officina Sans"', '"Fira Sans"', 'sans-serif'],
-            'body': ['"Trade Gothic Condensed"', '"Helvetica Neue"', 'sans-serif'],
-          }
-        }
-      }
-    }
-  </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@600&display=swap" rel="stylesheet">
-  <style>
-    @font-face {
-      font-family: 'Helvetica Neue';
-      src: url('https://fonts.cdnfonts.com/css/helvetica-neue-9');
-      font-weight: 300;
-      font-style: normal;
-    }
-    @font-face {
-      font-family: 'Helvetica Neue';
-      src: url('https://fonts.cdnfonts.com/css/helvetica-neue-9');
-      font-weight: 700;
-      font-style: normal;
-    }
-  </style>
   <script src="./config.js"></script>
+</head>
+<body class="min-h-screen bg-gray-50">
+  <!-- Header -->
+  <div id="siteHeader"></div>
+
+  <main class="max-w-md mx-auto p-4 sm:p-6 mt-4">
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+      <h2 class="text-2xl font-bold text-gray-900 mb-2">Request Access</h2>
+      <p class="text-gray-600 text-sm mb-6">Fill out the form below to request access to Taiko Quest.</p>
+      <form id="req" class="space-y-4">
+        <div>
+          <label class="block text-sm font-bold mb-1">First name</label>
+          <input name="first" class="w-full rounded-xl border border-gray-300 p-3" required />
+        </div>
+        <div>
+          <label class="block text-sm font-bold mb-1">Last name</label>
+          <input name="last" class="w-full rounded-xl border border-gray-300 p-3" required />
+        </div>
+        <div>
+          <label class="block text-sm font-bold mb-1">Email</label>
+          <input name="email" type="email" class="w-full rounded-xl border border-gray-300 p-3" required />
+        </div>
+        <button class="w-full rounded-xl bg-gray-900 text-white py-3 font-bold">Submit Request</button>
+      </form>
+      <p id="msg" class="text-sm text-gray-600 mt-4"></p>
+      <p class="text-xs text-gray-500 mt-2">Already approved? <a href="./access.html" class="text-gray-900 underline">Access my board</a></p>
+    </div>
+  </main>
+
   <script type="module">
-    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-    const { SUPABASE_URL, SUPABASE_KEY } = window.__ENV || {}
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
-    window.submitReq = async (e) => {
+    import { renderHeader, initHeader } from './js/header.js'
+    import { supaFromConfig } from './js/user-common.js'
+
+    document.getElementById('siteHeader').outerHTML = renderHeader({
+      admin: false,
+      nav: [['Request Access','./request.html'], ['Access My Board','./access.html']],
+      withAuth: false
+    })
+    initHeader()
+
+    const supabase = supaFromConfig()
+    const form = document.getElementById('req')
+    const msg  = document.getElementById('msg')
+
+    form.addEventListener('submit', async (e) => {
       e.preventDefault()
       const email = e.target.email.value.trim()
       const first = e.target.first.value.trim()
       const last  = e.target.last.value.trim()
-      if (!email || !first || !last) return alert('All fields required.')
-      const { error } = await supabase.from('registrations').insert({ email, first_name:first, last_name:last })
-      if (error) return alert('Error: '+error.message)
-      e.target.reset()
-      document.getElementById('msg').textContent = 'Thanks! We’ll email you after approval.'
-    }
+      if (!email || !first || !last) { msg.textContent = 'All fields required.'; return }
+
+      const { error } = await supabase.from('registrations')
+        .insert({ email, first_name:first, last_name:last })
+      if (error) {
+        if (String(error.message).includes('duplicate') || error.code === '23505') {
+          msg.textContent = 'You have already requested access. We’ll email you when approved.'
+        } else {
+          msg.textContent = 'Error: ' + error.message
+        }
+        return
+      }
+      form.reset()
+      msg.textContent = 'Thanks! We’ll email you after approval.'
+    })
   </script>
-</head>
-<body class="min-h-screen bg-gray-50">
-  <header class="bg-white shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-between">
-      <div class="flex items-center">
-        <img src="./assets/brand/TCA-Logo.png" alt="TCA Logo" class="h-8 sm:h-10 w-auto">
-        <h1 class="ml-2 sm:ml-3 text-lg sm:text-xl md:text-2xl font-bold font-title">Taiko Quest</h1>
-      </div>
-      <p class="text-xs sm:text-sm text-gray-500 font-body mt-1 sm:mt-0">NATC Phoenix 2025</p>
-    </div>
-  </header>
-
-  <main class="max-w-md mx-auto p-4 sm:p-6 mt-4">
-    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
-      <h2 class="text-2xl font-bold font-title text-gray-900 mb-2">Request Access</h2>
-      <p class="text-gray-600 font-body text-sm mb-6">Fill out the form below to request access to Taiko Quest</p>
-
-      <form class="space-y-4" onsubmit="submitReq(event)">
-        <div>
-          <label class="block text-sm font-body font-bold mb-1">First name</label>
-          <input name="first" class="w-full rounded-lg sm:rounded-xl border border-gray-300 p-3 font-body" required />
-        </div>
-        <div>
-          <label class="block text-sm font-body font-bold mb-1">Last name</label>
-          <input name="last" class="w-full rounded-lg sm:rounded-xl border border-gray-300 p-3 font-body" required />
-        </div>
-        <div>
-          <label class="block text-sm font-body font-bold mb-1">Email</label>
-          <input name="email" type="email" class="w-full rounded-lg sm:rounded-xl border border-gray-300 p-3 font-body" required />
-        </div>
-        <button class="w-full rounded-lg sm:rounded-xl bg-gray-900 text-white py-3 font-body font-bold transition-colors hover:bg-gray-800">Submit Request</button>
-      </form>
-
-      <p id="msg" class="text-sm text-gray-600 font-body mt-4"></p>
-    </div>
-
-    <div class="text-center mt-4">
-      <p class="text-sm font-body">Already approved? <a href="./access.html" class="text-gray-900 hover:underline font-bold">Access my board</a></p>
-      <a href="./index.html" class="text-sm text-gray-600 hover:text-gray-900 font-body block mt-2">← Back to Home</a>
-    </div>
-  </main>
 </body>
 </html>

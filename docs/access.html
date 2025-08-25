@@ -5,52 +5,72 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Access My Board · Taiko Quest NATC Phoenix 2025</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            'title': ['"ITC Officina Sans"', '"Fira Sans"', 'sans-serif'],
-            'body': ['"Trade Gothic Condensed"', '"Helvetica Neue"', 'sans-serif'],
-          }
-        }
-      }
-    }
-  </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@600&display=swap" rel="stylesheet">
-  <style>
-    @font-face {
-      font-family: 'Helvetica Neue';
-      src: url('https://fonts.cdnfonts.com/css/helvetica-neue-9');
-      font-weight: 300;
-      font-style: normal;
-    }
-    @font-face {
-      font-family: 'Helvetica Neue';
-      src: url('https://fonts.cdnfonts.com/css/helvetica-neue-9');
-      font-weight: 700;
-      font-style: normal;
-    }
-  </style>
   <script src="./config.js"></script>
-  <script type="module">
-    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-    const { SUPABASE_URL, SUPABASE_KEY } = window.__ENV || {}
-    if (!SUPABASE_URL || !SUPABASE_KEY) { alert('Missing Supabase config'); throw new Error('No config') }
-    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+</head>
+<body class="min-h-screen bg-gray-50">
+  <!-- Header -->
+  <div id="siteHeader"></div>
 
+  <main class="max-w-md mx-auto p-4 sm:p-6 mt-4">
+    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
+      <h2 class="text-2xl font-bold text-gray-900 mb-2">Access My Board</h2>
+      <p class="text-gray-600 text-sm mb-6">Enter your email to receive a sign-in link.</p>
+
+      <form id="form" class="space-y-4">
+        <div>
+          <label for="email" class="block text-sm font-bold mb-1">Email</label>
+          <input id="email" name="email" type="email" autocomplete="email" inputmode="email"
+                 class="w-full rounded-xl border border-gray-300 p-3" required />
+        </div>
+        <button id="sendBtn" class="w-full rounded-xl bg-gray-900 text-white py-3 font-bold">
+          Email me a sign-in link
+        </button>
+        <p class="text-xs text-gray-500 mt-1">No password needed. We’ll email you a one-time sign-in link.</p>
+      </form>
+
+      <div class="mt-4">
+        <p id="msg" class="text-sm text-gray-600"></p>
+        <p id="state" class="text-sm text-gray-800 mt-2"></p>
+      </div>
+    </div>
+
+    <!-- Consent modal -->
+    <div id="consentWrap" class="hidden fixed inset-0 bg-black/40 grid place-items-center p-4 z-50">
+      <div class="bg-white rounded-xl shadow-lg p-6 max-w-lg w-full">
+        <h2 class="text-xl font-bold mb-3">Media Consent</h2>
+        <p class="text-sm text-gray-700">I agree that TCA may use photos/videos I submit for media purposes as described in the Terms.</p>
+        <div class="mt-6 flex flex-wrap gap-3">
+          <button id="agreeBtn" class="px-5 py-2.5 rounded-lg bg-gray-900 text-white font-bold">I Agree</button>
+          <a href="./TERMS.html" class="px-5 py-2.5 rounded-lg bg-gray-100">Read Terms</a>
+          <a href="./PRIVACY.html" class="px-5 py-2.5 rounded-lg bg-gray-100">Privacy</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { renderHeader, initHeader } from './js/header.js'
+    import { supaFromConfig, sendMagicLink, gateCheck, agreeConsent } from './js/user-common.js'
+
+    document.getElementById('siteHeader').outerHTML = renderHeader({
+      admin: false,
+      nav: [['Request Access','./request.html'], ['Access My Board','./access.html']],
+      withAuth: false
+    })
+    initHeader()
+
+    const supabase = supaFromConfig()
     const form = document.getElementById('form')
     const emailInput = document.getElementById('email')
     const sendBtn = document.getElementById('sendBtn')
     const msg = document.getElementById('msg')
     const state = document.getElementById('state')
     const consentWrap = document.getElementById('consentWrap')
+    const agreeBtn = document.getElementById('agreeBtn')
 
+    // Cooldown to prevent spam
     let sending = false, cooldownTimer = null
     const COOLDOWN_SEC = 60
-    function redirectBase(){ return `${location.origin}${location.pathname}${location.search}` }
     function startCooldown(){
       let remain = COOLDOWN_SEC
       sendBtn.disabled = true
@@ -69,130 +89,46 @@
       },1000)
     }
 
-    async function signIn(e){
+    form.addEventListener('submit', async (e) => {
       e.preventDefault()
+      const { data:{ user } } = await supabase.auth.getUser()
+      if (user) return afterLogin()
 
-      // If already signed in, don’t send another email—continue the flow
-      const { data:{ user: existing } } = await supabase.auth.getUser()
-      if (existing) { afterLogin(); return }
-
-      const email = emailInput.value.trim()
-      if (!email) { msg.textContent = 'Email required.'; emailInput.focus(); return }
       if (sending) return
       sending = true
-      msg.textContent = 'Sending magic link…'
-
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: redirectBase() }
-      })
+      const email = emailInput.value.trim()
+      const { ok, error } = await sendMagicLink(supabase, email) // redirectTo defaults to this page
       sending = false
-      if (error) { msg.textContent = 'Error: ' + error.message; return }
+      if (!ok) { msg.textContent = 'Error: ' + error; return }
       msg.textContent = 'Check your email for the sign-in link.'
       startCooldown()
-    }
+    })
 
-    // Called when user returns via magic link or was already logged in
-    async function afterLogin(){
-      const { data:{ user } } = await supabase.auth.getUser()
-      if(!user) return
-      // Ensure profile exists
-      await supabase.from('profiles').upsert(
-        { id:user.id, email:user.email, display_name:user.user_metadata?.full_name||'' },
-        { onConflict:'id' }
-      )
-      // Check consent + approval
-      const { data: prof, error } = await supabase
-        .from('profiles').select('consent,approved').eq('id', user.id).maybeSingle()
-      if (error) { msg.textContent = 'Error: ' + error.message; return }
-      if (!prof?.consent) { consentWrap.classList.remove('hidden'); return }
+    async function afterLogin() {
+      const { user, needsConsent, approved, regStatus } = await gateCheck(supabase)
+      if (!user) return
+      if (needsConsent) { consentWrap.classList.remove('hidden'); return }
+      if (approved) { window.location.replace('./board.html'); return }
 
-      // ✅ New: if profile is already approved, go straight to board
-      if (prof?.approved) { location.href = './board.html'; return }
-
-      // Otherwise, look up registration by email
-      const { data: reg } = await supabase
-        .from('registrations').select('status').eq('email', user.email).maybeSingle()
-
-      if (reg?.status === 'approved') {
-        await supabase.from('profiles').update({ approved:true }).eq('id', user.id)
-        location.href = './board.html'
+      if (regStatus === 'approved') {
+        // Optionally flip approved here; board.html also handles it.
+        // await supabase.from('profiles').update({ approved:true }).eq('id', user.id)
+        window.location.replace('./board.html')
+      } else if (regStatus === 'rejected') {
+        state.textContent = 'Your request was not approved.'
       } else {
-        state.textContent='Pending approval. Please check back later.'
+        state.textContent = 'Pending approval. Please check back later.'
       }
     }
 
-    async function agreeConsent(){
-      const { data:{ user } } = await supabase.auth.getUser()
-      await supabase.from('profiles').update({ consent:true }).eq('id', user.id)
-      const { data: prof } = await supabase.from('profiles').select('consent,approved').eq('id', user.id).maybeSingle()
-      // If approved already, go straight to board
-      if (prof?.approved) { location.href = './board.html'; return }
-      // Else run the gate (checks registrations)
-      await afterLogin()
-    }
+    agreeBtn.addEventListener('click', async () => {
+      await agreeConsent(supabase)
+      afterLogin()
+    })
 
-    // Boot: proceed if session exists; also listen for auth state changes
+    // Auto-continue if returning with a session
     supabase.auth.getUser().then(({data:{user}})=>{ if(user) afterLogin() })
     supabase.auth.onAuthStateChange((event) => { if (event === 'SIGNED_IN') afterLogin() })
-
-    // Wire up
-    window.signIn = signIn
-    window.agreeConsent = agreeConsent
   </script>
-</head>
-<body class="min-h-screen bg-gray-50">
-  <header class="bg-white shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-between">
-      <div class="flex items-center">
-        <img src="./assets/brand/TCA-Logo.png" alt="TCA Logo" class="h-8 sm:h-10 w-auto">
-        <h1 class="ml-2 sm:ml-3 text-lg sm:text-xl md:text-2xl font-bold font-title">Taiko Quest</h1>
-      </div>
-      <p class="text-xs sm:text-sm text-gray-500 font-body mt-1 sm:mt-0">NATC Phoenix 2025</p>
-    </div>
-  </header>
-
-  <main class="max-w-md mx-auto p-4 sm:p-6 mt-4">
-    <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
-      <h2 class="text-2xl font-bold font-title text-gray-900 mb-2">Access My Board</h2>
-      <p class="text-gray-600 font-body text-sm mb-6">Enter your email to receive a sign-in link</p>
-
-      <form id="form" class="space-y-4" onsubmit="signIn(event)">
-        <div>
-          <label for="email" class="block text-sm font-body font-bold mb-1">Email</label>
-          <input id="email" name="email" type="email" autocomplete="email" inputmode="email"
-                class="w-full rounded-lg sm:rounded-xl border border-gray-300 p-3 font-body" required />
-        </div>
-        <button id="sendBtn" class="w-full rounded-lg sm:rounded-xl bg-gray-900 text-white py-3 font-body font-bold transition-colors hover:bg-gray-800">
-          Email me a sign-in link
-        </button>
-        <p class="text-xs text-gray-500 mt-1 font-body">No password needed. We'll email you a one-time sign-in link.</p>
-      </form>
-
-      <div class="mt-4">
-        <p id="msg" class="text-sm text-gray-600 font-body"></p>
-        <p id="state" class="text-sm text-gray-800 font-body mt-2"></p>
-      </div>
-    </div>
-
-    <div class="text-center mt-4">
-      <a href="./index.html" class="text-sm text-gray-600 hover:text-gray-900 font-body">← Back to Home</a>
-    </div>
-
-    <!-- Consent modal -->
-    <div id="consentWrap" class="hidden fixed inset-0 bg-black/40 grid place-items-center p-4 z-50">
-      <div class="bg-white rounded-xl shadow-lg p-6 max-w-lg w-full">
-        <h2 class="text-xl font-bold font-title mb-3">Media Consent</h2>
-        <p class="text-sm text-gray-700 font-body">
-          I agree that TCA may use photos/videos I submit for media purposes as described in the Terms.
-        </p>
-        <div class="mt-6 flex flex-wrap gap-3 justify-center sm:justify-start w-full overflow-hidden">
-          <button onclick="agreeConsent()" class="px-5 py-2.5 rounded-lg bg-gray-900 text-white font-body font-bold hover:bg-gray-800 transition-colors">I Agree</button>
-          <a href="./TERMS.html" class="px-5 py-2.5 rounded-lg bg-gray-100 text-gray-800 font-body hover:bg-gray-200 transition-colors">Read Terms</a>
-          <a href="./PRIVACY.html" class="px-5 py-2.5 rounded-lg bg-gray-100 text-gray-800 font-body hover:bg-gray-200 transition-colors">Privacy</a>
-        </div>
-      </div>
-    </div>
-  </main>
 </body>
 </html>
