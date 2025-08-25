@@ -9,37 +9,60 @@ export function supaFromConfig() {
 
 export function redirectBase() {
   // strip hash; Supabase allow-list ignores fragments
-  const location = window.location
-  return `${location.origin}${location.pathname}${location.search}`
+  const { origin, pathname, search } = window.location
+  return `${origin}${pathname}${search}`
 }
 
-export function updateAuthUI(user, els) {
+export function updateAuthUI(user, els = {}) {
   const { signinBtn, signoutBtn, whoami } = els
   const loggedIn = !!user
   if (signinBtn)  signinBtn.classList.toggle('hidden', loggedIn)
   if (signoutBtn) signoutBtn.classList.toggle('hidden', !loggedIn)
-  if (whoami)     whoami.textContent = loggedIn ? `Signed in as ${user.email}` : 'Not signed in'
+  if (whoami)     whoami.textContent = loggedIn ? `Signed in as ${user.display_name || user.email}` : 'Not signed in'
+}
+
+async function getSessionProfileAndAdmin(supabase, adminDomain) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { user: null, profile: null, isAdmin: false, displayName: null }
+
+  const metaName = user.user_metadata?.full_name || user.user_metadata?.name || ''
+  await supabase.from('profiles').upsert(
+    { id: user.id, email: user.email, display_name: metaName },
+    { onConflict: 'id' }
+  )
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+
+  const { data: adminRow } = await supabase.from('admins').select('user_id').eq('user_id', user.id).maybeSingle()
+
+  const domainOk = !adminDomain || (user.email?.toLowerCase().endsWith(adminDomain.toLowerCase()))
+  const isAdmin = !!adminRow && domainOk
+  const displayName = profile?.display_name || metaName || user.email || 'Signed in'
+
+  return { user, profile, isAdmin, displayName }
 }
 
 export async function requireAdmin(supabase, ADMIN_DOMAIN, els) {
   // wires auth state + toggles buttons, ensures profile exists, checks role
-  const { data:{ user } } = await supabase.auth.getUser()
-  updateAuthUI(user, els)
-  if (!user) return { user: null, admin: false }
+  const { user, profile, isAdmin, displayName } = await getSessionProfileAndAdmin(supabase, ADMIN_DOMAIN)
+  updateAuthUI(user ? {name: displayName, email: user?.email} : null, els)
+  return { user, profile, admin: isAdmin }
+}
 
-  // upsert profile (self-only policies; no recursion)
-  await supabase.from('profiles').upsert(
-    { id: user.id, email: user.email, display_name: user.user_metadata?.full_name || '' },
-    { onConflict: 'id' }
-  )
+export async function requireAdminOrRedirect(supabase, { adminDomain, requireApproved = false, redirectTo = '.../request.html', els} = {}) {
+  const { user, profile, isAdmin, displayName } = await getSessionProfileAndAdmin(supabase, adminDomain)
+  updateAuthUI(user ? {name: displayName, email: user?.email} : null, els)
+  if (!user) return { user: null, profile: null, admin: false, redirect: false }
 
-  // optional domain gate
-  const domainOk = !ADMIN_DOMAIN || (user.email?.endsWith(ADMIN_DOMAIN))
-  if (!domainOk) return { user, admin: false }
-
-  // role check
-  const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
-  return { user, admin: prof?.role === 'admin' }
+  const needsRedirect = (!isAdmin) || (requireApproved && profile?.approved)
+  if (needsRedirect) {
+    const target = new URL(redirectTo, window.location.href).toString()
+    if (window.location.toStging() !== target) {
+      window.location.replace(target)
+      return { user, profile, admin: false, redirect: true }
+    }
+  }
+  return { user, profile, admin: true, redirect: false }
 }
 
 export async function signInGoogle(supabase) {
@@ -49,5 +72,5 @@ export async function signInGoogle(supabase) {
   })
 }
 export async function signOut(supabase) {
-  await supabase.auth.signOut(); location.reload()
+  await supabase.auth.signOut(); window.location.reload()
 }
