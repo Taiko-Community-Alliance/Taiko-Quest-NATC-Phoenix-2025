@@ -17,26 +17,24 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4   # no ref override
+      - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # Build Tailwind: input in src/styles/tailwind.css → output to docs/assets/tailwind.css
+      # Build Tailwind with the standalone CLI
       - name: Build CSS
         run: |
           mkdir -p docs/assets
-          npx --yes tailwindcss -i ./src/styles/tailwind.css -o ./docs/assets/tailwind.css --minify
+          npx --yes @tailwindcss/cli@latest -i ./src/styles/tailwind.css -o ./docs/assets/tailwind.css --minify
 
-      # Stage site to dist/ (site root = dist/)
       - name: Stage site
         run: |
           rm -rf dist
           mkdir -p dist
           cp -R docs/* dist/
 
-      # Runtime config (NOT committed)
       - name: Write config.js
         run: |
           cat > dist/config.js <<'EOF'
