@@ -1,12 +1,14 @@
-// Minimal shared helpers for admin pages
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 export function supaFromConfig() {
   const { SUPABASE_URL, SUPABASE_KEY } = window.__ENV || {}
-  if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Missing Supabase config')
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    alert('Missing Supabase config'); throw new Error('Missing Supabase config')
+  }
   return createClient(SUPABASE_URL, SUPABASE_KEY)
 }
 
+// Build a redirect URL without hash
 export function redirectBase() {
   // strip hash; Supabase allow-list ignores fragments
   const { origin, pathname, search } = window.location
@@ -42,6 +44,7 @@ async function getSessionProfileAndAdmin(supabase, adminDomain) {
   return { user, profile, isAdmin, displayName }
 }
 
+// Ensure profile exists + check admin role; optional domain gate
 export async function requireAdmin(supabase, ADMIN_DOMAIN, els) {
   // wires auth state + toggles buttons, ensures profile exists, checks role
   const { user, profile, isAdmin, displayName } = await getSessionProfileAndAdmin(supabase, ADMIN_DOMAIN)
@@ -71,6 +74,7 @@ export async function signInGoogle(supabase) {
     options: { redirectTo: redirectBase() }
   })
 }
+
 export async function signOut(supabase) {
   await supabase.auth.signOut(); window.location.reload()
 }
