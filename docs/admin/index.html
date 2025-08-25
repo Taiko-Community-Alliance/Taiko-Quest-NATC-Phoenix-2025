@@ -81,6 +81,7 @@
 
     const whoami   = document.getElementById('whoami')
     const signin   = document.getElementById('signin')
+    const signin2   = document.getElementById('signin2')
     const signout = document.getElementById('signout')
     const signedOut= document.getElementById('signedOut')
     const noAccess = document.getElementById('noAccess')
@@ -88,6 +89,7 @@
 
     const doSignIn = () => signInGoogle(supabase)
     if (signin) signin.onclick = () => signInGoogle(supabase)
+    if (signin2) signin2.onclick = () => signInGoogle(supabase)
     if (signout) signout.onclick = () => signOut(supabase)
 
     async function boot(){
