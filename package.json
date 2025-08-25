@@ -1,0 +1,11 @@
+{
+  "name": "taiko-quest-natc-phoenix-2025",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.js -i src/styles/tailwind.css -o docs/assets/tailwind.css --minify",
+    "dev:css": "tailwindcss -c tailwind.config.js -i src/styles/tailwind.css -o docs/assets/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.10"
+  }
+}

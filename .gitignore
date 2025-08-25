@@ -1,7 +1,11 @@
 docs/config.js
+docs/assets/tailwind.css
 config.js
 dist/config.js
 dist/docs/config.js
 
+/node_modules
+
 .env
 .env.local
+package-lock.json
