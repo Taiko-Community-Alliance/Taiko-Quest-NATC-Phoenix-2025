@@ -1,4 +1,5 @@
 name: Build & Deploy Pages
+
 on:
   push:
     branches: [ main ]
@@ -17,15 +18,37 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # Stage your /docs folder as the site
-      - name: Stage site
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # Install dev deps (tailwindcss) from package.json
+      - name: Install dependencies
+        run: npm ci
+
+      # Build Tailwind straight into the dist/docs folder
+      - name: Build Tailwind CSS
+        env:
+          NODE_ENV: production
+        run: |
+          mkdir -p dist/docs/assets
+          npx tailwindcss -c tailwind.config.js \
+            -i src/styles/tailwind.css \
+            -o dist/docs/assets/tailwind.css \
+            --minify
+
+      # Stage the rest of the site (HTML/JS/assets from docs)
+      - name: Stage site files
         run: |
           mkdir -p dist/docs
           cp -R docs/* dist/docs/
 
-      # Create runtime config from repo secrets (no commit to git)
+      # Create runtime config from repo secrets (not committed)
       - name: Write config.js
         run: |
           cat > dist/docs/config.js <<'EOF'
@@ -35,7 +58,8 @@ jobs:
           };
           EOF
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
@@ -45,7 +69,8 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment:
       name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/deploy-pages@v4
-        with:
-          preview: ${{ github.ref != 'refs/heads/main' }}
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
