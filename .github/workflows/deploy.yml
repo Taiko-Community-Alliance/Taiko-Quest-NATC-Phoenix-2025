@@ -27,7 +27,7 @@ jobs:
       - name: Build CSS
         run: |
           mkdir -p docs/assets
-          npx --yes @tailwindcss/cli@latest -i ./src/styles/tailwind.css -o ./docs/assets/tailwind.css --minify
+          npx --yes tailwindcss@3.4.10 -i ./src/styles/tailwind.css -o ./docs/assets/tailwind.css --minify
 
       - name: Stage site
         run: |
