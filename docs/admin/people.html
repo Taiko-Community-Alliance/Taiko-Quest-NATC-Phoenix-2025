@@ -177,7 +177,7 @@
 
     async function loadProfiles() {
       profilesBox.innerHTML = '<div class="text-gray-500">Loading…</div>'
-      let q = supabase.from('profiles').select('id,email,display_name,approved,role,created_at').order('created_at',{ascending:false}).limit(50)
+      let q = supabase.from('v_profiles_adminflag').select('id,email,display_name,approved,is_admin,created_at').order('created_at',{ascending:false}).limit(50)
       const term = (searchEmail.value||'').trim()
       if (term) q = q.ilike('email', `%${term}%`)
       const { data, error } = await q
@@ -196,27 +196,37 @@
             <span class="text-xs px-2 py-1 rounded-full ${p.approved?'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200':'bg-gray-100 text-gray-700 ring-1 ring-gray-200'}">
               ${p.approved?'approved':'pending'}
             </span>
-            <span class="text-xs px-2 py-1 rounded-full ${p.role==='admin'?'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200':'bg-gray-100 text-gray-700 ring-1 ring-gray-200'}">
-              ${p.role}
+            <span class="text-xs px-2 py-1 rounded-full ${p.is_admin?'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200':'bg-gray-100 text-gray-700 ring-1 ring-gray-200'}">
+              ${p.is_admin?'admin':'user'}
             </span>
             <button class="btn-toggle-approve px-3 py-1.5 rounded-lg bg-gray-100 text-sm" data-id="${p.id}" data-now="${p.approved}">
               ${p.approved?'Revoke':'Approve'}
             </button>
-            <button class="btn-toggle-role px-3 py-1.5 rounded-lg bg-gray-900 text-white text-sm" data-id="${p.id}" data-role="${p.role}">
-              ${p.role==='admin'?'Demote to attendee':'Promote to admin'}
+            <button class="btn-toggle-admin px-3 py-1.5 rounded-lg bg-gray-900 text-white text-sm" data-id="${p.id}" data-admin="${p.is_admin}">
+              ${p.is_admin?'Remove admin':'Make admin'}
             </button>
           </div>
         `
         profilesBox.appendChild(row)
       }
       profilesBox.querySelectorAll('.btn-toggle-approve').forEach(b=>b.onclick = async (e)=>{
-        const id = e.currentTarget.dataset.id; const now = e.currentTarget.dataset.now === 'true'
-        await supabase.from('profiles').update({ approved: !now }).eq('id', id); loadProfiles()
+        const id = e.currentTarget.dataset.id; 
+        const now = e.currentTarget.dataset.now === 'true'
+        const {error} = await supabase.from('profiles').update({ approved: !now }).eq('id', id); loadProfiles()
+        if (error) return alert(`Error: ${error.message}`)
+        loadProfiles()
       })
-      profilesBox.querySelectorAll('.btn-toggle-role').forEach(b=>b.onclick = async (e)=>{
-        const id = e.currentTarget.dataset.id; const role = e.currentTarget.dataset.role
-        const to = role==='admin' ? 'attendee' : 'admin'
-        await supabase.from('profiles').update({ role: to }).eq('id', id); loadProfiles()
+      profilesBox.querySelectorAll('.btn-toggle-admin').forEach(b=>b.onclick = async (e)=>{
+        const id = e.currentTarget.dataset.id;
+        const isAdmin = e.currentTarget.dataset.admin === 'true'
+        if (isAdmin) {
+          const { error } = await supabase.from('admins').delete().eq('user_id', id)
+          if (error) return alert(`Demote failed: ${error.message}`)
+        } else {
+          const { error } = await supabase.from('admins').insert({ user_id: id })
+          if (error) return alert(`Promote failed: ${error.message}`)
+        }
+        loadProfiles()
       })
     }
 

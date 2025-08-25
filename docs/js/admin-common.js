@@ -10,58 +10,62 @@ export function supaFromConfig() {
 
 // Build a redirect URL without hash
 export function redirectBase() {
-  return `${location.origin}${location.pathname}${location.search}`
+  // strip hash; Supabase allow-list ignores fragments
+  const { origin, pathname, search } = window.location
+  return `${origin}${pathname}${search}`
 }
 
-// Show who’s signed in (or not)
-export function updateAuthUI(userLike, els) {
-  const { signinBtn, signoutBtn, whoami } = els || {}
-  const loggedIn = !!userLike
+export function updateAuthUI(user, els = {}) {
+  const { signinBtn, signoutBtn, whoami } = els
+  const loggedIn = !!user
   if (signinBtn)  signinBtn.classList.toggle('hidden', loggedIn)
   if (signoutBtn) signoutBtn.classList.toggle('hidden', !loggedIn)
-  if (whoami)     whoami.textContent = loggedIn
-    ? `Signed in as ${userLike.name || userLike.email}`
-    : 'Not signed in'
+  if (whoami)     whoami.textContent = loggedIn ? `Signed in as ${user.display_name || user.email}` : 'Not signed in'
 }
 
-// Ensure profile exists + check admin role; optional domain gate
-export async function requireAdmin(supabase, ADMIN_DOMAIN, els) {
-  const { data:{ user } } = await supabase.auth.getUser()
-  if (!user) {
-    updateAuthUI(null, els)
-    return { user: null, profile: null, admin: false }
-  }
+async function getSessionProfileAndAdmin(supabase, adminDomain) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { user: null, profile: null, isAdmin: false, displayName: null }
 
-  // 1) Best-effort guess of a display name from auth metadata
   const metaName = user.user_metadata?.full_name || user.user_metadata?.name || ''
-
-  // 2) Upsert profile (id/email + an initial display_name if we have one)
   await supabase.from('profiles').upsert(
     { id: user.id, email: user.email, display_name: metaName },
     { onConflict: 'id' }
   )
 
-  // 3) Read profile (now authoritative for name + role)
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('display_name, role, email')
-    .eq('id', user.id)
-    .maybeSingle()
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
 
-  // Robust display name fallback chain
+  const { data: adminRow } = await supabase.from('admins').select('user_id').eq('user_id', user.id).maybeSingle()
+
+  const domainOk = !adminDomain || (user.email?.toLowerCase().endsWith(adminDomain.toLowerCase()))
+  const isAdmin = !!adminRow && domainOk
   const displayName = profile?.display_name || metaName || user.email || 'Signed in'
 
-  // Update header UI immediately
-  updateAuthUI({ name: displayName, email: user.email }, els)
+  return { user, profile, isAdmin, displayName }
+}
 
-  // Domain “gate” for UI (RLS still enforces)
-  const domainOk = !ADMIN_DOMAIN || (user.email?.toLowerCase().endsWith(ADMIN_DOMAIN.toLowerCase()))
+// Ensure profile exists + check admin role; optional domain gate
+export async function requireAdmin(supabase, ADMIN_DOMAIN, els) {
+  // wires auth state + toggles buttons, ensures profile exists, checks role
+  const { user, profile, isAdmin, displayName } = await getSessionProfileAndAdmin(supabase, ADMIN_DOMAIN)
+  updateAuthUI(user ? {name: displayName, email: user?.email} : null, els)
+  return { user, profile, admin: isAdmin }
+}
 
-  return {
-    user,
-    profile,           // { display_name, role, email } or null
-    admin: !!(domainOk && profile?.role === 'admin')
+export async function requireAdminOrRedirect(supabase, { adminDomain, requireApproved = false, redirectTo = '.../request.html', els} = {}) {
+  const { user, profile, isAdmin, displayName } = await getSessionProfileAndAdmin(supabase, adminDomain)
+  updateAuthUI(user ? {name: displayName, email: user?.email} : null, els)
+  if (!user) return { user: null, profile: null, admin: false, redirect: false }
+
+  const needsRedirect = (!isAdmin) || (requireApproved && profile?.approved)
+  if (needsRedirect) {
+    const target = new URL(redirectTo, window.location.href).toString()
+    if (window.location.toStging() !== target) {
+      window.location.replace(target)
+      return { user, profile, admin: false, redirect: true }
+    }
   }
+  return { user, profile, admin: true, redirect: false }
 }
 
 export async function signInGoogle(supabase) {
@@ -72,6 +76,5 @@ export async function signInGoogle(supabase) {
 }
 
 export async function signOut(supabase) {
-  await supabase.auth.signOut()
-  location.reload()
+  await supabase.auth.signOut(); window.location.reload()
 }
