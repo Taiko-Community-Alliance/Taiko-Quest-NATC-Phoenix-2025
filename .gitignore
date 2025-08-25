@@ -8,4 +8,3 @@ dist/docs/config.js
 
 .env
 .env.local
-package-lock.json
