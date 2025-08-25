@@ -1,197 +1,243 @@
-<script type="module">
-  import { renderHeader, initHeader } from './js/header.js'
-  import {
-    supaFromConfig, requireApprovedOrRedirect, ensureProfile,
-    getOrCreateBoard, getBoardItems, generateNormalsForTrack,
-    drawBonusMission, uploadProof, signOut
-  } from './js/user-common.js'
+<!doctype html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>My Quest Board · Taiko Quest NATC Phoenix 2025</title>
+  <meta name="color-scheme" content="light only">
+  <!-- Built CSS (from CI): -->
+  <link rel="stylesheet" href="./assets/tailwind.css" />
+  <!-- Runtime config (generated in CI; must load BEFORE any modules that read window.__ENV) -->
+  <script src="./config.js"></script>
+  <!-- Export helper -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body class="h-full">
+  <!-- Header placeholder (injected by header.js) -->
+  <div id="siteHeader"></div>
 
-  // Header
-  document.getElementById('siteHeader').outerHTML = renderHeader({
-    nav: [['Home','./index.html'], ['Tracks','./tracks.html']],
-    withAuth:true
-  })
-  initHeader()
+  <main class="max-w-6xl mx-auto p-4 sm:p-6">
+    <!-- Page heading -->
+    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div>
+        <h1 class="text-2xl sm:text-3xl font-semibold">My Quest Board</h1>
+        <p class="text-sm text-gray-600">Taiko Quest NATC Phoenix 2025</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 text-sm">
+        <!-- whoami/signout provided by header.js; we keep actions local here -->
+        <button id="exportBtn" class="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">Export board</button>
+        <button id="shareBtn"  class="px-3 py-2 rounded-lg bg-gray-100 text-sm">Share</button>
+      </div>
+    </header>
 
-  const supabase = supaFromConfig()
-  document.getElementById('signout')?.addEventListener('click', () => signOut(supabase))
+    <!-- Progress line -->
+    <section class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div class="text-sm">
+        <span id="progress" class="font-medium">0/4 submitted</span>
+        <span id="verified" class="ml-2 text-gray-600">0 verified</span>
+      </div>
+      <div class="text-xs text-gray-500">
+        Tip: Photos up to 2 MB, videos up to 10 MB. A coordinator will mark items as Verified ✓.
+      </div>
+    </section>
 
-  // Elements
-  const whoami     = document.getElementById('whoami')
-  const grid       = document.getElementById('grid')
-  const progressEl = document.getElementById('progress')
-  const verifiedEl = document.getElementById('verified')
-  const exportBtn  = document.getElementById('exportBtn')
-  const shareBtn   = document.getElementById('shareBtn')
+    <!-- Pass/Bonus status bar (inserted just before board grid by script as well) -->
+    <section id="statusBar" class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <span id="passBadge"  class="text-[11px] px-2 py-1 rounded-full bg-gray-100 text-gray-700 ring-1 ring-gray-200">Pass requires 3 verified</span>
+        <span id="bonusBadge" class="text-[11px] px-2 py-1 rounded-full bg-gray-100 text-gray-700 ring-1 ring-gray-200">Bonus locked</span>
+      </div>
+      <div id="bonusCard" class="hidden">
+        <button id="bonusBtn" class="px-3 py-2 rounded-lg bg-amber-500 text-white text-sm disabled:opacity-50">Draw Bonus Mission</button>
+        <span id="bonusMsg" class="ml-2 text-sm text-gray-600"></span>
+      </div>
+    </section>
 
-  // New: pass & bonus UI
-  const statusBar  = document.createElement('section')
-  statusBar.className = 'mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'
-  statusBar.innerHTML = `
-    <div class="flex items-center gap-2">
-      <span id="passBadge" class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 ring-1 ring-gray-200">Pass requires 3 verified</span>
-      <span id="bonusBadge" class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 ring-1 ring-gray-200">Bonus locked</span>
-    </div>
-    <div id="bonusCard" class="hidden">
-      <button id="bonusBtn" class="px-3 py-2 rounded-lg bg-amber-500 text-white text-sm disabled:opacity-50">Draw Bonus Mission</button>
-      <span id="bonusMsg" class="ml-2 text-sm text-gray-600"></span>
-    </div>`
-  document.querySelector('main').insertBefore(statusBar, document.getElementById('boardWrap'))
+    <!-- Board grid -->
+    <section id="boardWrap" class="mt-4">
+      <div id="grid" class="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        <!-- cells injected -->
+      </div>
+    </section>
+  </main>
 
-  const passBadge  = statusBar.querySelector('#passBadge')
-  const bonusBadge = statusBar.querySelector('#bonusBadge')
-  const bonusCard  = statusBar.querySelector('#bonusCard')
-  const bonusBtn   = statusBar.querySelector('#bonusBtn')
-  const bonusMsg   = statusBar.querySelector('#bonusMsg')
+  <script type="module">
+    import { renderHeader, initHeader } from './js/header.js'
+    import {
+      supaFromConfig, requireApprovedOrRedirect, ensureProfile,
+      getOrCreateBoard, getBoardItems, generateNormalsForTrack,
+      drawBonusMission, uploadProof, signOut
+    } from './js/user-common.js'
 
-  function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) }
-  const levelBadge = (n)=>`<span class="ml-2 text-[10px] px-1.5 py-0.5 rounded ring-1 ring-gray-200 bg-gray-50 text-gray-700">Lv ${n}</span>`
-
-  async function boot(){
-    const params = new URLSearchParams(location.search)
-    const track  = (params.get('track') || '').toLowerCase()
-    const dayNo  = params.get('day') ? Number(params.get('day')) : 1
-    if (!track) { window.location.replace('./tracks.html'); return }
-
-    const guard = await requireApprovedOrRedirect(supabase, { redirectTo:'./access.html' })
-    if (guard.redirected) return
-
-    const { user } = await ensureProfile(supabase)
-    whoami?.classList.remove('hidden')
-    if (whoami) whoami.textContent = `Signed in as ${user.email}`
-
-    const board = await getOrCreateBoard(supabase, dayNo)
-    // Generate ONLY normals (4). Bonus will be drawn later.
-    await generateNormalsForTrack(supabase, board.id, track, 4)
-
-    document.querySelector('h1').textContent = `My Quest Board · ${track} · Day ${dayNo}`
-    await renderBoard(board.id, track)
-
-    // Wire bonus button
-    bonusBtn.onclick = async () => {
-      bonusBtn.disabled = true
-      bonusMsg.textContent = 'Drawing…'
-      try {
-        const res = await drawBonusMission(supabase, board.id, track, 4)
-        bonusMsg.textContent = res?.created ? 'Bonus added!' : 'Bonus already present.'
-        await renderBoard(board.id, track)
-      } catch (e) {
-        bonusMsg.textContent = e.message || 'Not eligible yet.'
-      } finally {
-        setTimeout(()=>{ bonusMsg.textContent='' }, 2500)
-        bonusBtn.disabled = false
-      }
-    }
-  }
-
-  async function renderBoard(boardId, track) {
-    const all = await getBoardItems(supabase, boardId)
-
-    const normals = all.filter(it => (it.track||'').toLowerCase() === track && !it.is_bonus)
-    const bonus   = all.filter(it => (it.track||'').toLowerCase() === track && it.is_bonus)
-
-    // Progress & verification counts
-    const totalNormals = normals.length
-    const submittedNormals = normals.filter(it => !!it.proof_url).length
-    const verifiedNormals  = normals.filter(it => !!it.verified).length
-
-    const bonusSubmitted = bonus.some(it => !!it.proof_url)
-    const bonusVerified  = bonus.some(it => !!it.verified)
-
-    progressEl.textContent = `${submittedNormals}/${totalNormals} submitted`
-    verifiedEl.textContent = `${verifiedNormals} verified`
-
-    // Pass / bonus badges
-    if (verifiedNormals >= 3) {
-      passBadge.textContent = 'Pass ✓ (3 verified)'
-      passBadge.className = 'text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
-    } else {
-      passBadge.textContent = `Pass requires 3 verified · ${verifiedNormals}/3`
-      passBadge.className = 'text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 ring-1 ring-gray-200'
-    }
-
-    const allFourVerified = (totalNormals >= 4) && (verifiedNormals === 4)
-    const hasBonus = bonus.length > 0
-
-    if (hasBonus) {
-      bonusBadge.textContent = bonusVerified ? 'Bonus ✓ Verified' : (bonusSubmitted ? 'Bonus submitted' : 'Bonus active')
-      bonusBadge.className   = 'text-xs px-2 py-1 rounded-full bg-amber-50 text-amber-800 ring-1 ring-amber-200'
-      bonusCard.classList.add('hidden') // already drawn → hide button
-    } else {
-      bonusBadge.textContent = allFourVerified ? 'Bonus unlocked' : 'Bonus locked'
-      bonusBadge.className   = allFourVerified
-        ? 'text-xs px-2 py-1 rounded-full bg-amber-50 text-amber-800 ring-1 ring-amber-200'
-        : 'text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700 ring-1 ring-gray-200'
-      bonusCard.classList.toggle('hidden', !allFourVerified)
-      bonusBtn.disabled = !allFourVerified
-    }
-
-    // Render cards (normals first, then bonus if any)
-    grid.innerHTML = ''
-    const renderCell = (it, idx, tagHtml='') => {
-      const cell = document.createElement('div')
-      cell.className = 'rounded-xl ring-1 ring-black/5 bg-white p-3 flex flex-col gap-2'
-      cell.innerHTML = `
-        <div class="text-xs text-gray-500">#${idx}${tagHtml} ${levelBadge(it.questions?.level)}</div>
-        <div class="text-sm text-gray-900">${escapeHtml(it.questions?.text || '')}</div>
-        <div class="flex items-center gap-2 mt-1">
-          ${it.proof_url
-            ? `<a href="${it.proof_url}" target="_blank" class="text-xs underline break-all">View proof</a>`
-            : `<span class="text-xs text-gray-500">No proof yet</span>`}
-          ${it.verified ? `<span class="ml-auto text-xs text-emerald-700">Verified ✓</span>` : ''}
-        </div>
-        <div class="flex items-center justify-between gap-2">
-          <input type="file" accept="image/*,video/*" data-id="${it.id}" class="text-xs">
-          <button class="btn-upload px-2.5 py-1.5 rounded-lg bg-gray-900 text-white text-xs" data-id="${it.id}">Upload</button>
-        </div>`
-      grid.appendChild(cell)
-    }
-
-    normals.forEach((it, i) => renderCell(it, i+1))
-    bonus.forEach((it) => renderCell(
-      it,
-      normals.length + 1,
-      `<span class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 ring-1 ring-amber-200">Bonus</span>`
-    ))
-
-    // Wire uploads
-    grid.querySelectorAll('.btn-upload').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        const id = e.currentTarget.dataset.id
-        const inp = grid.querySelector(`input[type=file][data-id="${id}"]`)
-        const file = inp?.files?.[0]
-        if (!file) { alert('Choose a file first.'); return }
-        try {
-          await uploadProof(supabase, id, file)
-          await renderBoard(boardId, track)
-        } catch (err) { alert(err.message || 'Upload failed') }
-      })
+    // Inject site header with auth controls + minimal nav
+    document.getElementById('siteHeader').outerHTML = renderHeader({
+      nav: [['Home','./index.html'], ['Tracks','./tracks.html']],
+      withAuth: true
     })
-  }
+    initHeader()
 
-  // Export / Share (unchanged)
-  exportBtn.onclick = async () => {
-    exportBtn.disabled = true
-    try {
-      const canvas = await html2canvas(document.getElementById('grid'), { backgroundColor: '#ffffff', scale: 2 })
-      const url = canvas.toDataURL('image/png')
-      const a = document.createElement('a'); a.href = url; a.download = 'taiko-quest-board.png'; a.click()
-    } finally { exportBtn.disabled = false }
-  }
-  shareBtn.onclick = async () => {
-    try {
-      const canvas = await html2canvas(document.getElementById('grid'), { backgroundColor: '#ffffff', scale: 2 })
-      const blob = await new Promise(res => canvas.toBlob(res, 'image/png'))
-      if (navigator.canShare && navigator.canShare({ files: [new File([blob], 'taiko-quest-board.png', { type: 'image/png' })] })) {
-        const file = new File([blob], 'taiko-quest-board.png', { type: 'image/png' })
-        await navigator.share({ files: [file], title: 'My Taiko Quest Board' })
-      } else {
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a'); a.href = url; a.download = 'taiko-quest-board.png'; a.click()
-        URL.revokeObjectURL(url)
+    const supabase  = supaFromConfig()
+    const grid      = document.getElementById('grid')
+    const progressEl= document.getElementById('progress')
+    const verifiedEl= document.getElementById('verified')
+
+    const passBadge = document.getElementById('passBadge')
+    const bonusBadge= document.getElementById('bonusBadge')
+    const bonusCard = document.getElementById('bonusCard')
+    const bonusBtn  = document.getElementById('bonusBtn')
+    const bonusMsg  = document.getElementById('bonusMsg')
+
+    const exportBtn = document.getElementById('exportBtn')
+    const shareBtn  = document.getElementById('shareBtn')
+
+    const levelBadge = (n)=>`<span class="ml-2 text-[10px] px-1.5 py-0.5 rounded ring-1 ring-gray-200 bg-gray-50 text-gray-700">Lv ${n}</span>`
+    const chipBonus  = `<span class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 ring-1 ring-amber-200">Bonus</span>`
+    const esc = s => (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+
+    async function boot(){
+      // Track/day come from query (?track=shimedaiko&day=1); default day=1
+      const params = new URLSearchParams(location.search)
+      const track  = (params.get('track')||'').toLowerCase()
+      const dayNo  = params.get('day') ? Number(params.get('day')) : 1
+      if (!track) { window.location.replace('./tracks.html'); return }
+
+      // Gate: must be signed-in + approved + consented
+      const guard = await requireApprovedOrRedirect(supabase, { redirectTo:'./access.html' })
+      if (guard.redirected) return
+
+      // Identify + ensure board exists; generate normals if none
+      await ensureProfile(supabase)
+      const board = await getOrCreateBoard(supabase, dayNo)
+      await generateNormalsForTrack(supabase, board.id, track, 4)
+
+      // Title suffix
+      document.querySelector('h1').textContent = `My Quest Board · ${track} · Day ${dayNo}`
+
+      // First paint
+      await renderBoard(board.id, track)
+
+      // Bonus draw button
+      bonusBtn.onclick = async () => {
+        bonusBtn.disabled = true
+        bonusMsg.textContent = 'Drawing…'
+        try {
+          const res = await drawBonusMission(supabase, board.id, track, 4)
+          bonusMsg.textContent = res?.created ? 'Bonus added!' : 'Bonus already present.'
+          await renderBoard(board.id, track)
+        } catch (e) {
+          bonusMsg.textContent = e.message || 'Not eligible yet.'
+        } finally {
+          setTimeout(()=>{ bonusMsg.textContent='' }, 2500)
+          bonusBtn.disabled = false
+        }
       }
-    } catch { alert('Share failed.') }
-  }
 
-  boot()
-</script>
+      // Export / Share
+      exportBtn.onclick = async () => {
+        exportBtn.disabled = true
+        try {
+          const canvas = await html2canvas(grid, { backgroundColor: '#ffffff', scale: 2 })
+          const url = canvas.toDataURL('image/png')
+          const a = document.createElement('a'); a.href = url; a.download = 'taiko-quest-board.png'; a.click()
+        } finally { exportBtn.disabled = false }
+      }
+      shareBtn.onclick = async () => {
+        try {
+          const canvas = await html2canvas(grid, { backgroundColor: '#ffffff', scale: 2 })
+          const blob = await new Promise(res => canvas.toBlob(res, 'image/png'))
+          if (navigator.canShare && navigator.canShare({ files: [new File([blob], 'taiko-quest-board.png', { type: 'image/png' })] })) {
+            const file = new File([blob], 'taiko-quest-board.png', { type: 'image/png' })
+            await navigator.share({ files: [file], title: 'My Taiko Quest Board' })
+          } else {
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a'); a.href = url; a.download = 'taiko-quest-board.png'; a.click()
+            URL.revokeObjectURL(url)
+          }
+        } catch { alert('Share failed.') }
+      }
+    }
+
+    async function renderBoard(boardId, track){
+      const all = await getBoardItems(supabase, boardId)
+      const normals = all.filter(it => (it.track||'').toLowerCase() === track && !it.is_bonus)
+      const bonus   = all.filter(it => (it.track||'').toLowerCase() === track && it.is_bonus)
+
+      const totalNormals = normals.length
+      const submittedNormals = normals.filter(it => !!it.proof_url).length
+      const verifiedNormals  = normals.filter(it => !!it.verified).length
+
+      const bonusSubmitted = bonus.some(it => !!it.proof_url)
+      const bonusVerified  = bonus.some(it => it.verified)
+      const hasBonus       = bonus.length > 0
+
+      // Progress text
+      progressEl.textContent = `${submittedNormals}/${totalNormals} submitted`
+      verifiedEl.textContent = `${verifiedNormals} verified`
+
+      // Pass badge
+      if (verifiedNormals >= 3) {
+        passBadge.textContent = 'Pass ✓ (3 verified)'
+        passBadge.className = 'text-[11px] px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+      } else {
+        passBadge.textContent = `Pass requires 3 verified · ${verifiedNormals}/3`
+        passBadge.className = 'text-[11px] px-2 py-1 rounded-full bg-gray-100 text-gray-700 ring-1 ring-gray-200'
+      }
+
+      // Bonus badge + button visibility
+      const allFourVerified = (totalNormals >= 4) && (verifiedNormals === 4)
+      if (hasBonus) {
+        bonusBadge.textContent = bonusVerified ? 'Bonus ✓ Verified' : (bonusSubmitted ? 'Bonus submitted' : 'Bonus active')
+        bonusBadge.className   = 'text-[11px] px-2 py-1 rounded-full bg-amber-50 text-amber-800 ring-1 ring-amber-200'
+        bonusCard.classList.add('hidden')
+      } else {
+        bonusBadge.textContent = allFourVerified ? 'Bonus unlocked' : 'Bonus locked'
+        bonusBadge.className   = allFourVerified
+          ? 'text-[11px] px-2 py-1 rounded-full bg-amber-50 text-amber-800 ring-1 ring-amber-200'
+          : 'text-[11px] px-2 py-1 rounded-full bg-gray-100 text-gray-700 ring-1 ring-gray-200'
+        bonusCard.classList.toggle('hidden', !allFourVerified)
+        if (allFourVerified) bonusBtn.disabled = false
+      }
+
+      // Render cells
+      grid.innerHTML = ''
+      const addCell = (it, idx, tagHtml='') => {
+        const cell = document.createElement('div')
+        cell.className = 'rounded-xl ring-1 ring-black/5 bg-white p-3 flex flex-col gap-2'
+        cell.innerHTML = `
+          <div class="text-xs text-gray-500">#${idx} ${tagHtml} ${levelBadge(it.questions?.level)}</div>
+          <div class="text-sm text-gray-900">${esc(it.questions?.text || '')}</div>
+          <div class="flex items-center gap-2 mt-1">
+            ${it.proof_url
+              ? `<a href="${it.proof_url}" target="_blank" class="text-xs underline break-all">View proof</a>`
+              : `<span class="text-xs text-gray-500">No proof yet</span>`}
+            ${it.verified ? `<span class="ml-auto text-xs text-emerald-700">Verified ✓</span>` : ''}
+          </div>
+          <div class="flex items-center justify-between gap-2">
+            <input type="file" accept="image/*,video/*" data-id="${it.id}" class="text-xs">
+            <button class="btn-upload px-2.5 py-1.5 rounded-lg bg-gray-900 text-white text-xs" data-id="${it.id}">Upload</button>
+          </div>`
+        grid.appendChild(cell)
+      }
+
+      normals.forEach((it, i) => addCell(it, i+1))
+      bonus.forEach((it) => addCell(it, normals.length + 1, chipBonus))
+
+      // Wire uploads
+      grid.querySelectorAll('.btn-upload').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = e.currentTarget.dataset.id
+          const inp = grid.querySelector(`input[type=file][data-id="${id}"]`)
+          const file = inp?.files?.[0]
+          if (!file) { alert('Choose a file first.'); return }
+          try {
+            await uploadProof(supabase, id, file)
+            await renderBoard(boardId, track)
+          } catch (err) { alert(err.message || 'Upload failed') }
+        })
+      })
+    }
+
+    boot()
+  </script>
+</body>
+</html>
