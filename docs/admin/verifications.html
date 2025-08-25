@@ -146,7 +146,10 @@
     async function verifyItem(e) {
       const id = e.currentTarget.dataset.id
       // Update the base table; view is read-only
-      const { error } = await supabase.from('board_items').update({ verified: true }).eq('id', id)
+      // In your admin verifications page
+      const { error } = await supabase.from('board_items')
+        .update({ verified: true, verified_at: new Date().toISOString(), verified_by: adminUserId })
+        .eq('id', itemId)
       if (error) { alert('Verify failed: ' + error.message); return }
       await load()
     }
