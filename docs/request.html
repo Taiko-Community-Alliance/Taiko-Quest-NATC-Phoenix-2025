@@ -3,72 +3,73 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Request Access · Taiko Quest NATC Phoenix 2025</title>
+  <title>Taiko Quest · Request Access</title>
   <link rel="stylesheet" href="./assets/tailwind.css">
   <script src="./config.js"></script>
 </head>
 <body class="min-h-screen bg-gray-50">
-  <!-- Header -->
+  <!-- Header (injected) -->
   <div id="siteHeader"></div>
 
   <main class="max-w-md mx-auto p-4 sm:p-6 mt-4">
     <div class="bg-white rounded-xl shadow-sm p-6 mb-6">
       <h2 class="text-2xl font-bold text-gray-900 mb-2">Request Access</h2>
-      <p class="text-gray-600 text-sm mb-6">Fill out the form below to request access to Taiko Quest.</p>
-      <form id="req" class="space-y-4">
+      <p class="text-gray-600 text-sm mb-6">We’ll email you a one-time sign-in link.</p>
+
+      <form class="space-y-4" id="reqForm">
         <div>
           <label class="block text-sm font-bold mb-1">First name</label>
-          <input name="first" class="w-full rounded-xl border border-gray-300 p-3" required />
+          <input name="first" class="w-full rounded-xl border p-3" required />
         </div>
         <div>
           <label class="block text-sm font-bold mb-1">Last name</label>
-          <input name="last" class="w-full rounded-xl border border-gray-300 p-3" required />
+          <input name="last" class="w-full rounded-xl border p-3" required />
         </div>
         <div>
           <label class="block text-sm font-bold mb-1">Email</label>
-          <input name="email" type="email" class="w-full rounded-xl border border-gray-300 p-3" required />
+          <input name="email" type="email" class="w-full rounded-xl border p-3" required />
         </div>
-        <button class="w-full rounded-xl bg-gray-900 text-white py-3 font-bold">Submit Request</button>
+        <button class="w-full rounded-xl bg-gray-900 text-white py-3 font-bold">Email me a sign-in link</button>
       </form>
+
       <p id="msg" class="text-sm text-gray-600 mt-4"></p>
-      <p class="text-xs text-gray-500 mt-2">Already approved? <a href="./access.html" class="text-gray-900 underline">Access my board</a></p>
+      <p class="text-xs text-gray-500 mt-1">After you click the link, we’ll finish setup on the Access page.</p>
+    </div>
+
+    <div class="text-center mt-4">
+      <a href="./access.html" class="text-sm text-gray-600 hover:text-gray-900">Already requested? Access my board</a>
     </div>
   </main>
 
   <script type="module">
     import { renderHeader, initHeader } from './js/header.js'
-    import { supaFromConfig } from './js/user-common.js'
+    import { supaFromConfig, sendMagicLink, redirectBaseNoHash } from './js/user-common.js'
 
+    // Inject header (no auth controls on this page)
     document.getElementById('siteHeader').outerHTML = renderHeader({
-      admin: false,
-      nav: [['Request Access','./request.html'], ['Access My Board','./access.html']],
-      withAuth: false
+      admin: false, nav: [['Home','./index.html']], withAuth: false
     })
     initHeader()
 
     const supabase = supaFromConfig()
-    const form = document.getElementById('req')
-    const msg  = document.getElementById('msg')
+    const form = document.getElementById('reqForm')
+    const msg = document.getElementById('msg')
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault()
-      const email = e.target.email.value.trim()
+      const email = e.target.email.value.trim().toLowerCase()
       const first = e.target.first.value.trim()
       const last  = e.target.last.value.trim()
-      if (!email || !first || !last) { msg.textContent = 'All fields required.'; return }
+      if (!email || !first || !last) return
 
-      const { error } = await supabase.from('registrations')
-        .insert({ email, first_name:first, last_name:last })
-      if (error) {
-        if (String(error.message).includes('duplicate') || error.code === '23505') {
-          msg.textContent = 'You have already requested access. We’ll email you when approved.'
-        } else {
-          msg.textContent = 'Error: ' + error.message
-        }
-        return
-      }
-      form.reset()
-      msg.textContent = 'Thanks! We’ll email you after approval.'
+      // Save draft for access.html to create the registration after login
+      localStorage.setItem(`tq_reg:${email}`, JSON.stringify({ first, last }))
+
+      const redirectTo = redirectBaseNoHash().replace('/request.html','/access.html')
+      const { ok, error } = await sendMagicLink(supabase, email, redirectTo)
+      if (!ok) { msg.textContent = 'Error: ' + error; return }
+      msg.textContent = 'Check your email for the sign-in link.'
+      e.target.reset()
     })
   </script>
 </body>
