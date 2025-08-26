@@ -11,30 +11,117 @@
   <div class="max-w-6xl mx-auto p-4 sm:p-6">
     <div id="siteHeader"></div>
 
-    <!-- (Create, Filters, List) — unchanged from the last version I gave you -->
-    <!-- ... SNIP ... keep your existing markup from the last message ... -->
+    <!-- Create question -->
+    <section id="createBox" class="hidden bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-4 sm:p-6 mb-6">
+      <h2 class="text-lg font-medium text-gray-900 mb-3">Create question</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+        <div class="sm:col-span-2 lg:col-span-4">
+          <label for="qtext" class="block text-sm font-medium text-gray-700 mb-1">Question text</label>
+          <textarea id="qtext" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-3"
+            rows="3" placeholder="e.g., Take a photo with a first-time attendee"></textarea>
+        </div>
+        <div>
+          <label for="qcat" class="block text-sm font-medium text-gray-700 mb-1">Category (optional)</label>
+          <input id="qcat" type="text" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5"
+            placeholder="chudaiko / odaiko / shimedaiko / okedo" />
+        </div>
+        <div>
+          <label for="qlevel" class="block text-sm font-medium text-gray-700 mb-1">Level</label>
+          <select id="qlevel" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5">
+            <option value="1" selected>1 (easy)</option>
+            <option value="2">2 (medium)</option>
+            <option value="3">3 (hard)</option>
+            <option value="4">4 (expert)</option>
+          </select>
+        </div>
+        <div>
+          <label for="qactive" class="block text-sm font-medium text-gray-700 mb-1">Active?</label>
+          <select id="qactive" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5">
+            <option value="true" selected>Yes</option>
+            <option value="false">No</option>
+          </select>
+        </div>
+        <div class="sm:self-end">
+          <button id="createBtn" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-medium hover:bg-black">
+            Add question
+          </button>
+        </div>
+      </div>
+      <p id="createMsg" class="text-sm text-gray-600 mt-2"></p>
+    </section>
 
+    <!-- Filters -->
+    <section id="controls" class="hidden bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-4 sm:p-6 mb-4">
+      <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
+        <div>
+          <label for="filterActive" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <select id="filterActive" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5">
+            <option value="all">All</option>
+            <option value="active" selected>Active only</option>
+            <option value="inactive">Inactive only</option>
+          </select>
+        </div>
+        <div>
+          <label for="filterLevel" class="block text-sm font-medium text-gray-700 mb-1">Level</label>
+          <select id="filterLevel" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5">
+            <option value="all" selected>All</option>
+            <option value="1">1 (easy)</option>
+            <option value="2">2 (medium)</option>
+            <option value="3">3 (hard)</option>
+            <option value="4">4 (expert)</option>
+          </select>
+        </div>
+        <div>
+          <label for="filterCategory" class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+          <select id="filterCategory" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5">
+            <option value="all" selected>All</option>
+            <option value="chudaiko">chudaiko</option>
+            <option value="odaiko">odaiko</option>
+            <option value="shimedaiko">shimedaiko</option>
+            <option value="okedo">okedo</option>
+          </select>
+        </div>
+        <div class="sm:col-span-2">
+          <label for="searchText" class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+          <input id="searchText" type="text" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5"
+                 placeholder="contains text…" />
+        </div>
+      </div>
+      <div class="mt-3">
+        <button id="refreshBtn" class="px-3 py-2 rounded-lg bg-gray-100 text-sm">Refresh</button>
+      </div>
+    </section>
+
+    <!-- Questions list -->
+    <section id="listBox" class="hidden">
+      <div id="qlist" class="grid grid-cols-1 gap-3"></div>
+      <div class="flex items-center justify-between mt-4">
+        <button id="prevBtn" class="px-3 py-2 rounded-xl bg-gray-100 text-sm disabled:opacity-50" disabled>Prev</button>
+        <span id="pageInfo" class="text-sm text-gray-600">Page 1</span>
+        <button id="nextBtn" class="px-3 py-2 rounded-xl bg-gray-100 text-sm disabled:opacity-50" disabled>Next</button>
+      </div>
+    </section>
   </div>
 
   <script type="module">
     import { renderHeader, initHeader, bindAuthButtons } from '../js/header.js'
-    import {
-      supaFromConfig,
-      requireAdmin,
-      signInGoogle,
-      signOut
-    } from '../js/admin-common.js'
 
+    // Header first (always visible)
     document.getElementById('siteHeader').outerHTML = renderHeader({
-        admin: true,
-        nav: [
-            ['Admin', './index.html'],
-            ['People', './people.html'],
-            ['Verifications', './verifications.html'],
-        ],
-        withAuth: true,
+      admin: true,
+      nav: [
+        ['Admin','./index.html'],
+        ['People','./people.html'],
+        ['Verifications','./verifications.html'],
+        ['Questions','./questions.html'],
+      ],
+      withAuth: true,
     })
     initHeader()
+
+    // Admin helpers (dynamic import)
+    const { supaFromConfig, requireAdmin, signInGoogle, signOut } =
+      await import('../js/admin-common.js')
 
     const supabase = supaFromConfig()
     bindAuthButtons({
@@ -42,8 +129,208 @@
       onSignOut: () => signOut(supabase)
     })
 
-    // ---- keep the rest of your existing questions.html script as-is ----
-    // It already uses requireAdmin(...) and all the handlers.
+    // Elements
+    const whoami = document.getElementById('whoami')
+    const signin = document.getElementById('signin')
+    const signout = document.getElementById('signout')
+
+    const createBox = document.getElementById('createBox')
+    const controls  = document.getElementById('controls')
+    const listBox   = document.getElementById('listBox')
+    const qlist     = document.getElementById('qlist')
+
+    const qtext   = document.getElementById('qtext')
+    const qcat    = document.getElementById('qcat')
+    const qlevel  = document.getElementById('qlevel')
+    const qactive = document.getElementById('qactive')
+    const createBtn = document.getElementById('createBtn')
+    const createMsg = document.getElementById('createMsg')
+
+    const filterActive   = document.getElementById('filterActive')
+    const filterLevel    = document.getElementById('filterLevel')
+    const filterCategory = document.getElementById('filterCategory')
+    const searchText     = document.getElementById('searchText')
+    const refreshBtn     = document.getElementById('refreshBtn')
+    const prevBtn        = document.getElementById('prevBtn')
+    const nextBtn        = document.getElementById('nextBtn')
+    const pageInfo       = document.getElementById('pageInfo')
+
+    // Guard
+    const guard = await requireAdmin(supabase, null, { signinBtn: signin, signoutBtn: signout, whoami })
+    if (!guard.admin) { window.location.replace('../request.html') }
+
+    // Reveal UI
+    createBox.classList.remove('hidden')
+    controls.classList.remove('hidden')
+    listBox.classList.remove('hidden')
+
+    let page = 1
+    const PAGE_SIZE = 20
+    let lastCount = 0
+
+    // Create
+    createBtn.addEventListener('click', async () => {
+      const text = qtext.value.trim()
+      if (!text) { createMsg.textContent = 'Please enter question text.'; return }
+      createBtn.disabled = true; createMsg.textContent = 'Saving…'
+      const { error } = await supabase.from('questions').insert({
+        text,
+        category: qcat.value.trim() || null,
+        level: Number(qlevel.value),
+        active: qactive.value === 'true'
+      })
+      createBtn.disabled = false
+      if (error) { createMsg.textContent = 'Error: ' + error.message; return }
+      createMsg.textContent = 'Saved!'
+      qtext.value = ''; qcat.value = ''; qlevel.value = '1'; qactive.value = 'true'
+      await loadQuestions()
+      setTimeout(() => (createMsg.textContent = ''), 1200)
+    })
+
+    // Filters + pagination
+    refreshBtn.onclick      = () => { page = 1; loadQuestions() }
+    filterActive.onchange   = () => { page = 1; loadQuestions() }
+    filterLevel.onchange    = () => { page = 1; loadQuestions() }
+    filterCategory.onchange = () => { page = 1; loadQuestions() }
+    searchText.oninput      = () => { page = 1; loadQuestions() }
+    prevBtn.onclick = () => { if (page > 1) { page--; loadQuestions() } }
+    nextBtn.onclick = () => { if ((page * PAGE_SIZE) < lastCount) { page++; loadQuestions() } }
+
+    async function loadQuestions() {
+      qlist.innerHTML = skeleton()
+      let q = supabase.from('questions').select('*', { count: 'exact' })
+        .order('active', { ascending: false })
+        .order('text', { ascending: true })
+
+      if (filterActive.value === 'active')   q = q.eq('active', true)
+      if (filterActive.value === 'inactive') q = q.eq('active', false)
+      if (filterLevel.value !== 'all')       q = q.eq('level', Number(filterLevel.value))
+      if (filterCategory.value !== 'all')    q = q.eq('category', filterCategory.value)
+      if (searchText.value.trim())           q = q.ilike('text', `%${searchText.value.trim()}%`)
+
+      const from = (page - 1) * PAGE_SIZE
+      const to   = from + PAGE_SIZE - 1
+      const { data, count, error } = await q.range(from, to)
+      if (error) { qlist.innerHTML = errorCard(error.message); return }
+
+      lastCount = count ?? 0
+      pageInfo.textContent = `Page ${page} · ${lastCount} total`
+      prevBtn.disabled = page <= 1
+      nextBtn.disabled = (page * PAGE_SIZE) >= lastCount
+
+      if (!data?.length) { qlist.innerHTML = emptyCard(); return }
+      qlist.innerHTML = ''
+      for (const row of data) qlist.appendChild(renderQuestionCard(row))
+    }
+
+    function renderQuestionCard(q) {
+      const wrap = document.createElement('div')
+      wrap.className = 'bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-4 sm:p-5'
+      wrap.innerHTML = `
+        <div class="flex items-center justify-between gap-3">
+          <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${q.active ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-gray-100 text-gray-700 ring-1 ring-gray-200'}">
+            ${q.active ? 'active' : 'inactive'}
+          </span>
+          <div class="text-xs text-gray-500 space-x-3">
+            <span>category: ${escapeHtml(q.category ?? '—')}</span>
+            <span>level: ${q.level ?? 1}</span>
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Text</label>
+          <textarea data-id="${q.id}" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-3" rows="3">${q.text}</textarea>
+        </div>
+
+        <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <input data-cat-id="${q.id}" type="text" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5" value="${escapeAttr(q.category ?? '')}" placeholder="chudaiko / odaiko / shimedaiko / okedo" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Level</label>
+            <select data-lvl-id="${q.id}" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5">
+              <option value="1" ${q.level==1?'selected':''}>1 (easy)</option>
+              <option value="2" ${q.level==2?'selected':''}>2 (medium)</option>
+              <option value="3" ${q.level==3?'selected':''}>3 (hard)</option>
+              <option value="4" ${q.level==4?'selected':''}>4 (expert)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select data-act-id="${q.id}" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5">
+              <option value="true"  ${q.active?'selected':''}>Active</option>
+              <option value="false" ${!q.active?'selected':''}>Inactive</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button class="btn-save px-3 py-2 rounded-xl bg-gray-900 text-white text-sm" data-id="${q.id}">Save</button>
+          <button class="btn-toggle px-3 py-2 rounded-xl bg-gray-100 text-gray-900 text-sm" data-id="${q.id}">
+            ${q.active ? 'Deactivate' : 'Activate'}
+          </button>
+          <button class="btn-copy px-3 py-2 rounded-xl bg-white text-gray-900 text-sm ring-1 ring-gray-300" data-id="${q.id}" title="Copy text to Create form">Copy → form</button>
+          <button class="btn-delete px-3 py-2 rounded-xl bg-white text-red-700 text-sm ring-1 ring-red-300" data-id="${q.id}" title="Prefer deactivating">Delete</button>
+        </div>
+      `
+
+      // Save updates
+      wrap.querySelector('.btn-save').onclick = async (e) => {
+        const id = e.currentTarget.dataset.id
+        const text   = wrap.querySelector(`textarea[data-id="${id}"]`).value.trim()
+        const catInp = wrap.querySelector(`input[data-cat-id="${id}"]`).value.trim()
+        const lvlSel = wrap.querySelector(`select[data-lvl-id="${id}"]`).value
+        const actSel = wrap.querySelector(`select[data-act-id="${id}"]`).value
+        const { error } = await supabase.from('questions').update({
+          text,
+          category: catInp || null,
+          level: Number(lvlSel),
+          active: actSel === 'true'
+        }).eq('id', id)
+        if (error) alert('Update failed: ' + error.message); else alert('Saved')
+      }
+
+      // Toggle active
+      wrap.querySelector('.btn-toggle').onclick = async (e) => {
+        const id = e.currentTarget.dataset.id
+        const isActive = wrap.querySelector('span').textContent.trim() === 'active'
+        const { error } = await supabase.from('questions').update({ active: !isActive }).eq('id', id)
+        if (error) alert('Toggle failed: ' + error.message); else loadQuestions()
+      }
+
+      // Copy to create form
+      wrap.querySelector('.btn-copy').onclick = () => {
+        const id = q.id
+        const text   = wrap.querySelector(`textarea[data-id="${id}"]`).value.trim()
+        const catInp = wrap.querySelector(`input[data-cat-id="${id}"]`).value.trim()
+        const lvlSel = wrap.querySelector(`select[data-lvl-id="${id}"]`).value
+        qtext.value = text
+        qcat.value = catInp
+        qlevel.value = lvlSel
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+        qtext.focus()
+      }
+
+      // Delete
+      wrap.querySelector('.btn-delete').onclick = async (e) => {
+        const id = e.currentTarget.dataset.id
+        if (!confirm('Delete this question? Prefer deactivating instead.')) return
+        const { error } = await supabase.from('questions').delete().eq('id', id)
+        if (error) alert('Delete failed: ' + error.message); else loadQuestions()
+      }
+
+      return wrap
+    }
+
+    function skeleton() { return `<div class="bg-white rounded-2xl ring-1 ring-black/5 p-4 animate-pulse text-sm text-gray-500">Loading…</div>` }
+    function emptyCard() { return `<div class="bg-white rounded-2xl ring-1 ring-black/5 p-6 text-gray-600">No questions found.</div>` }
+    function errorCard(msg) { return `<div class="bg-white rounded-2xl ring-1 ring-red-300 p-6 text-red-700">Error: ${escapeHtml(msg)}</div>` }
+    function escapeHtml(s=''){ return s.replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])) }
+    function escapeAttr(s=''){ return s.replace(/"/g,'&quot;') }
+
+    // First load
+    await loadQuestions()
   </script>
 </body>
 </html>

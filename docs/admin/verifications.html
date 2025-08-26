@@ -26,8 +26,8 @@
 
   <script type="module">
     import { renderHeader, initHeader, bindAuthButtons } from '../js/header.js'
-    import { supaFromConfig, requireAdmin, signInGoogle, signOut } from '../js/admin-common.js'
 
+    // Header first
     document.getElementById('siteHeader').outerHTML = renderHeader({
       admin: true,
       nav: [
@@ -39,6 +39,10 @@
       withAuth: true
     })
     initHeader()
+
+    // Admin helpers
+    const { supaFromConfig, requireAdmin, signInGoogle, signOut } =
+      await import('../js/admin-common.js')
 
     const supabase = supaFromConfig()
     bindAuthButtons({
@@ -56,7 +60,7 @@
     const refreshBtn = document.getElementById('refreshBtn')
 
     const guard = await requireAdmin(supabase, null, { signinBtn: signin, signoutBtn: signout, whoami })
-    if (!guard.admin) { window.location.replace('../request.html'); }
+    if (!guard.admin) { window.location.replace('../request.html') }
 
     content.classList.remove('hidden')
     refreshBtn.onclick = load
@@ -65,7 +69,6 @@
 
     async function load() {
       list.innerHTML = skeleton()
-      // Prefer using your SQL view if present:
       const term = (searchEmail.value || '').trim()
       let q = supabase.from('v_unverified_items')
         .select('item_id, proof_url, created_at, question_text, user_email')
@@ -74,9 +77,7 @@
       if (term) q = q.ilike('user_email', `%${term}%`)
       const { data, error } = await q
       if (error) {
-        list.innerHTML = errorCard(
-          'Could not load view v_unverified_items. Make sure it exists and your RLS allows admin read. ' + error.message
-        )
+        list.innerHTML = errorCard('Could not load view v_unverified_items. ' + error.message)
         return
       }
       if (!data?.length) {
@@ -118,7 +119,7 @@
     }
 
     function skeleton() { return `<div class="bg-white rounded-2xl ring-1 ring-black/5 p-4 animate-pulse text-sm text-gray-500">Loading…</div>` }
-    function errorCard(msg) { return `<div class="bg-white rounded-2xl ring-1 ring-red-300 p-6 text-red-700">Error: ${msg}</div>` }
+    function errorCard(msg) { return `<div class="bg-white rounded-2xl ring-1 ring-red-300 p-6 text-red-700">Error: ${escapeHtml(msg)}</div>` }
     function escapeHtml(s=''){ return s.replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])) }
   </script>
 </body>

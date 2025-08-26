@@ -29,8 +29,8 @@
 
   <script type="module">
     import { renderHeader, initHeader, bindAuthButtons } from '../js/header.js'
-    import { supaFromConfig, requireAdmin, signInGoogle, signOut } from '../js/admin-common.js'
 
+    // 1) Header first (always visible)
     document.getElementById('siteHeader').outerHTML = renderHeader({
       admin: true,
       nav: [
@@ -43,13 +43,17 @@
     })
     initHeader()
 
+    // 2) Admin code after header
+    const { supaFromConfig, requireAdmin, signInGoogle, signOut } =
+      await import('../js/admin-common.js')
+
     const supabase = supaFromConfig()
     bindAuthButtons({
       onSignIn: () => signInGoogle(supabase),
       onSignOut: () => signOut(supabase)
     })
 
-    // (Optional) also pass desktop ids for first-paint label swap
+    // Optional: first-paint label swap via desktop ids
     const whoami  = document.getElementById('whoami')
     const signin  = document.getElementById('signin')
     const signout = document.getElementById('signout')
