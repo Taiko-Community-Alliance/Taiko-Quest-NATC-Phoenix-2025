@@ -1,22 +1,16 @@
 // docs/js/header.js
-export function renderHeader({ admin = false, nav = [], withAuth = true } = {}) {
+export function renderHeader({ admin = false, nav = [], withAuth = true, homeHref = (admin ? './index.html' : './index.html') } = {}) {
   const links = (nav || [])
     .map(([label, href]) => `<a href="${href}" class="text-sm text-gray-700 hover:text-gray-900 px-2 py-1">${label}</a>`)
     .join('')
 
   return `
 <header class="bg-white shadow-sm">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-    <!-- Top: title + hamburger -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <!-- Title row -->
     <div class="flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <a href="${admin ? './index.html' : './index.html'}" class="text-lg sm:text-xl font-semibold text-gray-900">Taiko Quest</a>
-        <span class="hidden sm:inline text-sm text-gray-500">Taiko Community Alliance</span>
-      </div>
-      <button id="menuBtn" class="sm:hidden inline-flex items-center justify-center p-2 rounded-md ring-1 ring-gray-300">
-        <span class="sr-only">Open menu</span>
-        ☰
-      </button>
+      <a href="${homeHref}" class="text-lg sm:text-xl font-semibold text-gray-900">Taiko Quest</a>
+      <button id="menuBtn" class="sm:hidden inline-flex items-center justify-center p-2 rounded-md ring-1 ring-gray-300" aria-label="Open menu">☰</button>
       <div class="hidden sm:flex items-center gap-2">
         ${links}
         ${withAuth ? `
@@ -26,8 +20,8 @@ export function renderHeader({ admin = false, nav = [], withAuth = true } = {}) 
         ` : ''}
       </div>
     </div>
-    <!-- Subheader (small screens show org name here) -->
-    <div class="sm:hidden mt-1 text-xs text-gray-500">Taiko Community Alliance</div>
+    <!-- Subheader -->
+    <div class="mt-1 text-xs text-gray-500">Taiko Community Alliance</div>
   </div>
 
   <!-- Mobile menu -->
@@ -52,4 +46,31 @@ export function initHeader() {
   const btn = document.getElementById('menuBtn')
   const menu = document.getElementById('mobileMenu')
   if (btn && menu) btn.addEventListener('click', () => menu.classList.toggle('hidden'))
+}
+
+/**
+ * Bind auth button clicks across desktop + mobile.
+ * Pass your own handlers that call Supabase (so this works for admin & user pages).
+ * Example:
+ *   bindAuthButtons({
+ *     onSignIn: () => signInGoogle(supabase),
+ *     onSignOut: () => signOut(supabase)
+ *   })
+ */
+export function bindAuthButtons({ onSignIn, onSignOut } = {}) {
+  const all = (sel) => Array.from(document.querySelectorAll(sel)).filter(Boolean)
+  all('#signin, .js-signin').forEach(b => { if (onSignIn) b.onclick = onSignIn })
+  all('#signout, .js-signout').forEach(b => { if (onSignOut) b.onclick = onSignOut })
+}
+
+/**
+ * Optional helper to update header labels/buttons yourself if needed.
+ * You already call admin-common.updateAuthUI(user, els) elsewhere, so this stays optional.
+ */
+export function setHeaderAuthUI({ loggedIn, label = 'Signed in' }) {
+  const who = document.querySelectorAll('.js-whoami, #whoami')
+  who.forEach(el => el && (el.textContent = loggedIn ? `Signed in as ${label}` : 'Not signed in'))
+  const show = (sel, show) => document.querySelectorAll(sel).forEach(el => el && el.classList.toggle('hidden', !show))
+  show('#signin, .js-signin', !loggedIn)
+  show('#signout, .js-signout', loggedIn)
 }
