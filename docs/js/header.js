@@ -1,59 +1,48 @@
-// Injects a responsive header with "Taiko Quest" (link) + "Taiko Community Alliance" subheader.
-// Use `admin: true` on /docs/admin/* pages to fix relative paths.
-// Pass `nav` as an array of [label, href]. Set `withAuth: true` to render
-// placeholders with IDs: #whoami, #signin, #signout (your auth code can bind to these).
-export function renderHeader({ admin = false, nav = [], withAuth = false } = {}) {
-  const base = admin ? '..' : '.'
-  const home = admin ? '../index.html' : './index.html'
-
-  const navLinks = nav.map(([label, href]) =>
-    `<a href="${href}" class="px-3 py-2 rounded-lg hover:bg-gray-100 text-sm">${escapeHtml(label)}</a>`
-  ).join('')
-
-  const authHTML = withAuth ? `
-    <span id="whoami" class="hidden sm:inline text-sm text-gray-600">Checking session…</span>
-    <button id="signin" class="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">Sign in</button>
-    <button id="signout" class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 text-sm hidden">Sign out</button>
-  ` : ''
+// docs/js/header.js
+export function renderHeader({ admin = false, nav = [], withAuth = true } = {}) {
+  const links = (nav || [])
+    .map(([label, href]) => `<a href="${href}" class="text-sm text-gray-700 hover:text-gray-900 px-2 py-1">${label}</a>`)
+    .join('')
 
   return `
-<header class="bg-white/90 backdrop-blur shadow-sm">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-    <a href="${home}" class="group flex items-center gap-3">
-      <img src="${base}/assets/brand/TCA-Logo.png" alt="TCA Logo" class="h-8 w-auto" onerror="this.style.display='none'">
-      <div>
-        <div class="font-semibold text-lg group-hover:underline">Taiko Quest · NATC Phoenix 2025</div>
-        <div class="text-xs text-gray-600">Taiko Community Alliance</div>
+<header class="bg-white shadow-sm">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+    <!-- Top: title + hamburger -->
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="${admin ? './index.html' : './index.html'}" class="text-lg sm:text-xl font-semibold text-gray-900">Taiko Quest</a>
+        <span class="hidden sm:inline text-sm text-gray-500">Taiko Community Alliance</span>
       </div>
-    </a>
-
-    <!-- Desktop nav -->
-    <nav class="hidden sm:flex items-center gap-2">
-      ${navLinks}
-      ${authHTML}
-    </nav>
-
-    <!-- Mobile controls -->
-    <button id="menuBtn" class="sm:hidden p-2 rounded-lg border border-gray-200" aria-label="Open menu" aria-controls="mobileNav" aria-expanded="false">
-      <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-      </svg>
-    </button>
+      <button id="menuBtn" class="sm:hidden inline-flex items-center justify-center p-2 rounded-md ring-1 ring-gray-300">
+        <span class="sr-only">Open menu</span>
+        ☰
+      </button>
+      <div class="hidden sm:flex items-center gap-2">
+        ${links}
+        ${withAuth ? `
+          <span id="whoami" class="js-whoami text-sm text-gray-600">Checking session…</span>
+          <button id="signin" class="js-signin hidden px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">Sign in</button>
+          <button id="signout" class="js-signout hidden px-3 py-2 rounded-lg bg-gray-200 text-gray-900 text-sm">Sign out</button>
+        ` : ''}
+      </div>
+    </div>
+    <!-- Subheader (small screens show org name here) -->
+    <div class="sm:hidden mt-1 text-xs text-gray-500">Taiko Community Alliance</div>
   </div>
 
-  <!-- Mobile nav -->
-  <div id="mobileNav" class="sm:hidden hidden border-t border-gray-100">
-    <div class="px-4 py-3 flex flex-col gap-2">
-      ${nav.map(([label, href]) =>
-        `<a href="${href}" class="px-3 py-2 rounded-lg hover:bg-gray-100 text-sm">${escapeHtml(label)}</a>`
-      ).join('')}
+  <!-- Mobile menu -->
+  <div id="mobileMenu" class="sm:hidden hidden border-t border-gray-200">
+    <div class="px-4 py-3 space-y-2">
+      ${links ? `<nav class="flex flex-col gap-1">${links}</nav>` : ''}
       ${withAuth ? `
-        <div class="flex items-center gap-2 pt-2">
-          <span id="whoami" class="text-sm text-gray-600">Checking session…</span>
-          <!-- NOTE: We avoid duplicating IDs. Mobile auth buttons reuse the same IDs above,
-               so we *don't* render additional #signin/#signout here to keep IDs unique.
-               Your auth buttons remain accessible in the desktop row even on mobile. -->
-        </div>` : ``}
+        <div class="flex items-center justify-between pt-2">
+          <span class="js-whoami text-sm text-gray-600">Checking session…</span>
+          <div class="flex gap-2">
+            <button class="js-signin hidden px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">Sign in</button>
+            <button class="js-signout hidden px-3 py-2 rounded-lg bg-gray-200 text-gray-900 text-sm">Sign out</button>
+          </div>
+        </div>
+      ` : ''}
     </div>
   </div>
 </header>`
@@ -61,15 +50,6 @@ export function renderHeader({ admin = false, nav = [], withAuth = false } = {})
 
 export function initHeader() {
   const btn = document.getElementById('menuBtn')
-  const mobile = document.getElementById('mobileNav')
-  if (!btn || !mobile) return
-  btn.addEventListener('click', () => {
-    const isOpen = !mobile.classList.contains('hidden')
-    mobile.classList.toggle('hidden', isOpen)
-    btn.setAttribute('aria-expanded', String(!isOpen))
-  })
-}
-
-function escapeHtml(s='') {
-  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+  const menu = document.getElementById('mobileMenu')
+  if (btn && menu) btn.addEventListener('click', () => menu.classList.toggle('hidden'))
 }
