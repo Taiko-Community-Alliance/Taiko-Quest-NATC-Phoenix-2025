@@ -2,14 +2,23 @@
 <html lang="en" class="h-full bg-gray-50">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Admin · People · Taiko Quest NATC Phoenix 2025</title>
+  <title>Admin · People · Taiko Quest</title>
   <link rel="stylesheet" href="../assets/tailwind.css">
   <script src="../config.js"></script>
   <script type="module" src="../js/admin-common.js"></script>
 </head>
 <body class="h-full">
+  <!-- Header (injected) -->
+  <div id="siteHeader"></div>
+
   <div class="max-w-6xl mx-auto p-4 sm:p-6">
-    <div id="siteHeader"></div>
+    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <div>
+        <h1 class="text-2xl sm:text-3xl font-semibold text-gray-900">Admin · People</h1>
+        <p class="text-sm text-gray-600">Approve requests; manage admins.</p>
+      </div>
+      <!-- Auth controls live in the injected header -->
+    </header>
 
     <section id="content" class="hidden space-y-6">
       <!-- Pending registrations -->
@@ -21,7 +30,7 @@
         <div id="regs" class="space-y-2 text-sm"></div>
       </div>
 
-      <!-- Profiles & Admins -->
+      <!-- Profiles (read-only) + Admins toggle -->
       <div class="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-4 sm:p-6">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-lg font-medium">Profiles</h2>
@@ -37,31 +46,25 @@
 
   <script type="module">
     import { renderHeader, initHeader } from '../js/header.js'
-    import { supaFromConfig, requireAdmin, updateAuthUI, signInGoogle, signOut } from '../js/admin-common.js'
-    
+    import { supaFromConfig, requireAdmin, signInGoogle, signOut } from '../js/admin-common.js'
+
+    // Inject header (with auth controls)
     document.getElementById('siteHeader').outerHTML = renderHeader({
-        admin: true,
-        nav: [
-            ['Admin', './index.html'],
-            ['Questions', './questions.html'],
-            ['Verifications', './verifications.html'],
-            // ['Reports', './reports.html'], --- IGNORE ---
-        ],
-        withAuth: true,
+      admin: true,
+      nav: [['People','./people.html'], ['Questions','./questions.html'], ['Verifications','./verifications.html']],
+      withAuth: true
     })
     initHeader()
 
     const supabase = supaFromConfig()
-    const ADMIN_DOMAIN = '@taikocommunityalliance.org'
 
-    // Mobile elements
+    // Wire header auth controls
     const whoami = document.getElementById('whoami')
     const signin = document.getElementById('signin')
-    const signout = document.getElementById('signout')
+    const signoutBtn = document.getElementById('signout')
+    if (signin) signin.onclick = () => signInGoogle(supabase)
+    if (signoutBtn) signoutBtn.onclick = () => signOut(supabase)
 
-    // Common elements
-    const menuBtn = document.getElementById('menuBtn')
-    const mobileMenu = document.getElementById('mobileMenu')
     const content = document.getElementById('content')
     const regsBox = document.getElementById('regs')
     const profilesBox = document.getElementById('profiles')
@@ -69,21 +72,8 @@
     const refreshRegsBtn = document.getElementById('refreshRegs')
     const refreshProfilesBtn = document.getElementById('refreshProfiles')
 
-    // Toggle mobile menu
-    menuBtn.addEventListener('click', () => {
-      mobileMenu.classList.toggle('hidden')
-    })
-
-    const handleSignIn = () => signInGoogle(supabase)
-    const handleSignOut = () => signOut(supabase)
-
-    signin.onclick = handleSignIn
-    signout.onclick = handleSignOut
-
     async function boot() {
-      // For mobile view
-      const guard = await requireAdmin(supabase, ADMIN_DOMAIN, { signinBtn: signin, signoutBtn: signout, whoami })
-
+      const guard = await requireAdmin(supabase, '@taikocommunityalliance.org', { signinBtn: signin, signoutBtn: signoutBtn, whoami })
       if (!guard.admin) return
       content.classList.remove('hidden')
       await Promise.all([loadRegs(), loadProfiles()])
@@ -96,18 +86,19 @@
         .eq('status','pending').order('created_at', { ascending: true })
       if (error) { regsBox.innerHTML = `<div class="text-red-700">Error: ${error.message}</div>`; return }
       if (!data?.length) { regsBox.innerHTML = '<div class="text-gray-600">No pending registrations.</div>'; return }
+
       regsBox.innerHTML = ''
       for (const r of data) {
         const row = document.createElement('div')
         row.className = 'flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-2 rounded-lg ring-1 ring-gray-200'
         row.innerHTML = `
           <div>
-            <div class="font-medium">${r.first_name} ${r.last_name}</div>
-            <div class="text-gray-600 break-all">${r.email}</div>
+            <div class="font-medium">${r.first_name ?? '—'} ${r.last_name ?? ''}</div>
+            <div class="text-gray-600">${r.email}</div>
             <div class="text-gray-500 text-xs">requested ${new Date(r.created_at).toLocaleString()}</div>
           </div>
           <div class="flex gap-2">
-            <button class="btn-approve px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm" data-id="${r.id}" data-email="${r.email}">Approve</button>
+            <button class="btn-approve px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm" data-id="${r.id}">Approve</button>
             <button class="btn-reject px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm" data-id="${r.id}">Reject</button>
           </div>
         `
@@ -115,82 +106,83 @@
       }
       regsBox.querySelectorAll('.btn-approve').forEach(b => b.onclick = approveReg)
       regsBox.querySelectorAll('.btn-reject').forEach(b => b.onclick = rejectReg)
-      refreshProfilesBtn.click() // show fresh list after actions
     }
 
     async function approveReg(e) {
       const id = e.currentTarget.dataset.id
-      const email = e.currentTarget.dataset.email
-      // 1) mark registration approved
-      await supabase.from('registrations').update({ status:'approved', approved_at: new Date().toISOString() }).eq('id', id)
-      // 2) set matching profile.approved=true if profile exists
-      await supabase.from('profiles').update({ approved: true }).eq('email', email)
+      const { error } = await supabase.from('registrations')
+        .update({ status:'approved', approved_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) { alert(error.message); return }
       await loadRegs()
     }
+
     async function rejectReg(e) {
       const id = e.currentTarget.dataset.id
-      await supabase.from('registrations').update({ status:'rejected' }).eq('id', id)
+      const { error } = await supabase.from('registrations')
+        .update({ status:'rejected' })
+        .eq('id', id)
+      if (error) { alert(error.message); return }
       await loadRegs()
     }
 
     async function loadProfiles() {
       profilesBox.innerHTML = '<div class="text-gray-500">Loading…</div>'
-      let q = supabase.from('v_profiles_adminflag').select('id,email,display_name,approved,is_admin,created_at').order('created_at',{ascending:false}).limit(50)
+      // Prefer view if present
+      let query = supabase.from('v_profiles_adminflag')
+        .select('id,email,display_name,consent,is_admin,created_at')
+        .order('created_at',{ascending:false}).limit(100)
+
       const term = (searchEmail.value||'').trim()
-      if (term) q = q.ilike('email', `%${term}%`)
-      const { data, error } = await q
+      if (term) query = query.ilike('email', `%${term}%`)
+
+      const { data, error } = await query
       if (error) { profilesBox.innerHTML = `<div class="text-red-700">Error: ${error.message}</div>`; return }
+
       profilesBox.innerHTML = ''
-      for (const p of data||[]) {
+      for (const p of data || []) {
         const row = document.createElement('div')
         row.className = 'flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-2 rounded-lg ring-1 ring-gray-200'
         row.innerHTML = `
           <div>
-            <div class="font-medium break-all">${p.email}</div>
-            <div class="text-gray-600 text-sm">${p.display_name||'—'}</div>
+            <div class="font-medium">${p.email}</div>
+            <div class="text-gray-600 text-sm">${p.display_name || '—'}</div>
             <div class="text-gray-500 text-xs">${new Date(p.created_at).toLocaleString()}</div>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-xs px-2 py-1 rounded-full ${p.approved?'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200':'bg-gray-100 text-gray-700 ring-1 ring-gray-200'}">
-              ${p.approved?'approved':'pending'}
+            <span class="text-xs px-2 py-1 rounded-full ${p.consent?'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200':'bg-gray-100 text-gray-700 ring-1 ring-gray-200'}">
+              consent: ${p.consent?'yes':'no'}
             </span>
             <span class="text-xs px-2 py-1 rounded-full ${p.is_admin?'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200':'bg-gray-100 text-gray-700 ring-1 ring-gray-200'}">
-              ${p.is_admin?'admin':'user'}
+              ${p.is_admin?'admin':'attendee'}
             </span>
-            <button class="btn-toggle-approve px-3 py-1.5 rounded-lg bg-gray-100 text-sm" data-id="${p.id}" data-now="${p.approved}">
-              ${p.approved?'Revoke':'Approve'}
-            </button>
-            <button class="btn-toggle-admin px-3 py-1.5 rounded-lg bg-gray-900 text-white text-sm" data-id="${p.id}" data-admin="${p.is_admin}">
-              ${p.is_admin?'Remove admin':'Make admin'}
+            <button class="btn-toggle-admin px-3 py-1.5 rounded-lg ${p.is_admin?'bg-gray-900 text-white':'bg-gray-100'} text-sm" data-id="${p.id}" data-admin="${p.is_admin ? '1':'0'}">
+              ${p.is_admin ? 'Demote' : 'Promote to admin'}
             </button>
           </div>
         `
         profilesBox.appendChild(row)
       }
-      profilesBox.querySelectorAll('.btn-toggle-approve').forEach(b=>b.onclick = async (e)=>{
-        const id = e.currentTarget.dataset.id; 
-        const now = e.currentTarget.dataset.now === 'true'
-        const {error} = await supabase.from('profiles').update({ approved: !now }).eq('id', id); loadProfiles()
-        if (error) return alert(`Error: ${error.message}`)
-        loadProfiles()
-      })
-      profilesBox.querySelectorAll('.btn-toggle-admin').forEach(b=>b.onclick = async (e)=>{
-        const id = e.currentTarget.dataset.id;
-        const isAdmin = e.currentTarget.dataset.admin === 'true'
+
+      profilesBox.querySelectorAll('.btn-toggle-admin').forEach(b => b.onclick = async (e) => {
+        const id = e.currentTarget.dataset.id
+        const isAdmin = e.currentTarget.dataset.admin === '1'
+        let err = null
         if (isAdmin) {
           const { error } = await supabase.from('admins').delete().eq('user_id', id)
-          if (error) return alert(`Demote failed: ${error.message}`)
+          err = error
         } else {
           const { error } = await supabase.from('admins').insert({ user_id: id })
-          if (error) return alert(`Promote failed: ${error.message}`)
+          err = error
         }
+        if (err) { alert(err.message); return }
         loadProfiles()
       })
     }
 
-    refreshRegsBtn.onclick = loadRegs
-    refreshProfilesBtn.onclick = loadProfiles
-    searchEmail.oninput = () => { loadProfiles() }
+    document.getElementById('refreshRegs').onclick = loadRegs
+    document.getElementById('refreshProfiles').onclick = loadProfiles
+    document.getElementById('searchEmail').oninput = () => { loadProfiles() }
 
     boot()
   </script>
