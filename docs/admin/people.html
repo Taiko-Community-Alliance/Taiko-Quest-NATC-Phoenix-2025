@@ -36,8 +36,8 @@
 
   <script type="module">
     import { renderHeader, initHeader, bindAuthButtons } from '../js/header.js'
-    import { supaFromConfig, requireAdmin, signInGoogle, signOut } from '../js/admin-common.js'
 
+    // 1) Header first
     document.getElementById('siteHeader').outerHTML = renderHeader({
       admin: true,
       nav: [
@@ -49,6 +49,10 @@
       withAuth: true
     })
     initHeader()
+
+    // 2) Admin code
+    const { supaFromConfig, requireAdmin, signInGoogle, signOut } =
+      await import('../js/admin-common.js')
 
     const supabase = supaFromConfig()
     bindAuthButtons({
@@ -68,7 +72,7 @@
     const refreshProfilesBtn = document.getElementById('refreshProfiles')
 
     const guard = await requireAdmin(supabase, null, { signinBtn: signin, signoutBtn: signout, whoami })
-    if (!guard.admin) { window.location.replace('../request.html'); }
+    if (!guard.admin) { window.location.replace('../request.html') }
 
     content.classList.remove('hidden')
     await Promise.all([loadRegs(), loadProfiles()])
@@ -127,24 +131,19 @@
     async function loadProfiles() {
       profilesBox.innerHTML = '<div class="text-gray-500">Loading…</div>'
 
-      // Try the convenience view first (v_profiles_adminflag). If missing, fall back.
-      let rows = null, err = null
-      let usedView = true
+      // Prefer convenience view; fallback to merge if missing
+      let rows = null
       try {
-        const q1 = supabase.from('v_profiles_adminflag')
-          .select('id,email,display_name,approved,is_admin,created_at')
         const term = (searchEmail.value||'').trim()
-        const q2 = term ? q1.ilike('email', `%${term}%`) : q1
-        const { data, error } = await q2.order('created_at',{ascending:false}).limit(100)
+        let q = supabase.from('v_profiles_adminflag')
+          .select('id,email,display_name,approved,is_admin,created_at')
+          .order('created_at',{ascending:false})
+          .limit(100)
+        if (term) q = q.ilike('email', `%${term}%`)
+        const { data, error } = await q
         if (error) throw error
         rows = data
-      } catch (e) {
-        usedView = false
-        err = e
-      }
-
-      if (!rows) {
-        // Fallback: fetch profiles + admins and merge on client
+      } catch {
         const term = (searchEmail.value||'').trim()
         const { data: profs, error: e1 } = await (
           term
@@ -158,7 +157,7 @@
         rows = (profs||[]).map(p => ({ ...p, is_admin: adminSet.has(p.id) }))
       }
 
-      if (!rows.length) { profilesBox.innerHTML = '<div class="text-gray-600">No profiles found.</div>'; return }
+      if (!rows?.length) { profilesBox.innerHTML = '<div class="text-gray-600">No profiles found.</div>'; return }
 
       profilesBox.innerHTML = ''
       for (const p of rows) {
@@ -196,11 +195,8 @@
       profilesBox.querySelectorAll('.btn-toggle-admin').forEach(b=>b.onclick = async (e)=>{
         const id = e.currentTarget.dataset.id; const isAdmin = e.currentTarget.dataset.admin === 'true'
         let error = null
-        if (isAdmin) {
-          ({ error } = await supabase.from('admins').delete().eq('user_id', id))
-        } else {
-          ({ error } = await supabase.from('admins').insert({ user_id: id }))
-        }
+        if (isAdmin) ({ error } = await supabase.from('admins').delete().eq('user_id', id))
+        else        ({ error } = await supabase.from('admins').insert({ user_id: id }))
         if (error) alert(error.message); else loadProfiles()
       })
     }
