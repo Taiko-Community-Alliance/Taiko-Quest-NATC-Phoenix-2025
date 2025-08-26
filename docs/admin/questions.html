@@ -22,16 +22,23 @@
             rows="3" placeholder="e.g., Take a photo with a first-time attendee"></textarea>
         </div>
         <div>
-          <label for="qcat" class="block text-sm font-medium text-gray-700 mb-1">Category (optional)</label>
-          <input id="qcat" type="text" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5"
-            placeholder="people / places / performance" />
+          <!-- CHANGED to select with fixed tracks -->
+          <label for="qcat" class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+          <select id="qcat" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5">
+            <option value="shimedaiko">Shimedaiko</option>
+            <option value="odaiko">Odaiko</option>
+            <option value="chudaiko">Chūdaiko</option>
+            <option value="okedo">Okedō</option>
+          </select>
         </div>
         <div>
+          <!-- LEVEL now 1–4 numerics -->
           <label for="qlevel" class="block text-sm font-medium text-gray-700 mb-1">Level</label>
           <select id="qlevel" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5">
-            <option value="1" selected>Easy</option>
-            <option value="2">Medium</option>
-            <option value="3">Hard</option>
+            <option value="1">1 (Easy)</option>
+            <option value="2">2 (Medium)</option>
+            <option value="3">3 (Hard)</option>
+            <option value="4">4 (Expert)</option>
           </select>
         </div>
         <div>
@@ -48,11 +55,13 @@
         </div>
       </div>
       <p id="createMsg" class="text-sm text-gray-600 mt-2"></p>
+      <!-- NEW: Copy hint -->
+      <p id="copyHint" class="text-xs text-gray-500 mt-1 hidden">Prefilled from #<span id="copyId"></span></p>
     </section>
 
     <!-- Filters -->
     <section id="controls" class="hidden bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-4 sm:p-6 mb-4">
-      <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+      <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
         <div>
           <label for="filterActive" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
           <select id="filterActive" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5">
@@ -62,12 +71,25 @@
           </select>
         </div>
         <div>
+          <!-- CHANGED: numeric levels -->
           <label for="filterLevel" class="block text-sm font-medium text-gray-700 mb-1">Level</label>
           <select id="filterLevel" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5">
             <option value="all" selected>All</option>
-            <option value="easy">easy</option>
-            <option value="medium">medium</option>
-            <option value="hard">hard</option>
+            <option value="1">1 (Easy)</option>
+            <option value="2">2 (Medium)</option>
+            <option value="3">3 (Hard)</option>
+            <option value="4">4 (Expert)</option>
+          </select>
+        </div>
+        <div>
+          <!-- NEW: category filter -->
+          <label for="filterCategory" class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+          <select id="filterCategory" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5">
+            <option value="all" selected>All</option>
+            <option value="shimedaiko">Shimedaiko</option>
+            <option value="odaiko">Odaiko</option>
+            <option value="chudaiko">Chūdaiko</option>
+            <option value="okedo">Okedō</option>
           </select>
         </div>
         <div class="sm:col-span-2">
@@ -108,7 +130,6 @@
             ['Admin', './index.html'],
             ['People', './people.html'],
             ['Verifications', './verifications.html'],
-            // ['Reports', './reports.html'], --- IGNORE ---
         ],
         withAuth: true,
     })
@@ -135,9 +156,12 @@
     const qactive = document.getElementById('qactive')
     const createBtn = document.getElementById('createBtn')
     const createMsg = document.getElementById('createMsg')
+    const copyHint = document.getElementById('copyHint') // NEW
+    const copyIdSpan = document.getElementById('copyId') // NEW
 
     const filterActive = document.getElementById('filterActive')
     const filterLevel = document.getElementById('filterLevel')
+    const filterCategory = document.getElementById('filterCategory') // NEW
     const searchText = document.getElementById('searchText')
     const refreshBtn = document.getElementById('refreshBtn')
     const prevBtn = document.getElementById('prevBtn')
@@ -145,9 +169,11 @@
     const pageInfo = document.getElementById('pageInfo')
 
     // Toggle mobile menu
-    menuBtn.addEventListener('click', () => {
-      mobileMenu.classList.toggle('hidden')
-    })
+    if (menuBtn && mobileMenu) {
+      menuBtn.addEventListener('click', () => {
+        mobileMenu.classList.toggle('hidden')
+      })
+    }
 
     const handleSignIn = () => signInGoogle(supabase)
     const handleSignOut = () => signOut(supabase)
@@ -160,9 +186,7 @@
     let lastCount = 0
 
     async function boot() {
-      // For mobile view
       const guard = await requireAdmin(supabase, ADMIN_DOMAIN, { signinBtn: signin, signoutBtn: signout, whoami })
-
       if (!guard.admin) return
       createBox.classList.remove('hidden')
       controls.classList.remove('hidden')
@@ -177,14 +201,15 @@
       createBtn.disabled = true; createMsg.textContent = 'Saving…'
       const { error } = await supabase.from('questions').insert({
         text,
-        category: qcat.value.trim() || null,
-        level: qlevel.value,
+        category: qcat.value || null,
+        level: parseInt(qlevel.value, 10),
         active: qactive.value === 'true'
       })
       createBtn.disabled = false
       if (error) { createMsg.textContent = 'Error: ' + error.message; return }
       createMsg.textContent = 'Saved!'
-      qtext.value = ''; qcat.value = ''; qlevel.value = 'easy'; qactive.value = 'true'
+      qtext.value = ''; qcat.value = 'shimedaiko'; qlevel.value = '1'; qactive.value = 'true' // CHANGED defaults
+      copyHint.classList.add('hidden') // NEW
       await loadQuestions()
       setTimeout(() => (createMsg.textContent = ''), 1500)
     })
@@ -193,6 +218,7 @@
     refreshBtn.onclick = () => { page = 1; loadQuestions() }
     filterActive.onchange = () => { page = 1; loadQuestions() }
     filterLevel.onchange  = () => { page = 1; loadQuestions() }
+    filterCategory.onchange = () => { page = 1; loadQuestions() } // NEW
     searchText.oninput    = () => { page = 1; loadQuestions() }
     prevBtn.onclick = () => { if (page > 1) { page--; loadQuestions() } }
     nextBtn.onclick = () => { if ((page * PAGE_SIZE) < lastCount) { page++; loadQuestions() } }
@@ -205,8 +231,18 @@
 
       if (filterActive.value === 'active')   q = q.eq('active', true)
       if (filterActive.value === 'inactive') q = q.eq('active', false)
-      if (filterLevel.value !== 'all')       q = q.eq('level', filterLevel.value)
-      if (searchText.value.trim())           q = q.ilike('text', `%${searchText.value.trim()}%`)
+
+      if (filterLevel.value !== 'all') {
+        const lvl = parseInt(filterLevel.value, 10)
+        q = q.eq('level', lvl)
+      }
+
+      // NEW: Category filter
+      if (filterCategory.value !== 'all') {
+        q = q.eq('category', filterCategory.value)
+      }
+
+      if (searchText.value.trim()) q = q.ilike('text', `%${searchText.value.trim()}%`)
 
       const from = (page - 1) * PAGE_SIZE
       const to   = from + PAGE_SIZE - 1
@@ -233,6 +269,9 @@
       return `<div class="bg-white rounded-2xl ring-1 ring-red-300 p-6 text-red-700">Error: ${msg}</div>`
     }
 
+    const TRACK_LABEL = { shimedaiko:'Shimedaiko', odaiko:'Odaiko', chudaiko:'Chūdaiko', okedo:'Okedō' }
+    const LEVEL_LABEL = { 1:'1 (Easy)', 2:'2 (Medium)', 3:'3 (Hard)', 4:'4 (Expert)' }
+
     function renderQuestionCard(q) {
       const wrap = document.createElement('div')
       wrap.className = 'bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-4 sm:p-5'
@@ -242,8 +281,8 @@
             ${q.active ? 'active' : 'inactive'}
           </span>
           <div class="text-xs text-gray-500 space-x-3">
-            <span>category: ${q.category ?? '—'}</span>
-            <span>level: ${q.level ?? 'easy'}</span>
+            <span>category: ${TRACK_LABEL[q.category] || q.category || '—'}</span>
+            <span>level: ${LEVEL_LABEL[q.level] || q.level || '—'}</span>
           </div>
         </div>
 
@@ -252,8 +291,25 @@
           <textarea data-id="${q.id}" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-3" rows="3">${q.text}</textarea>
         </div>
 
+        <!-- NEW: Inline controls row -->
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <label class="text-xs flex items-center gap-1">
+            Level:
+            <select class="levelSel rounded border p-1 text-xs" data-id="${q.id}">
+              ${[1,2,3,4].map(n=>`<option value="${n}" ${q.level===n?'selected':''}>${n}</option>`).join('')}
+            </select>
+          </label>
+
+          <label class="text-xs inline-flex items-center gap-2 ml-3">
+            <input type="checkbox" class="activeChk" data-id="${q.id}" ${q.active ? 'checked' : ''} />
+            Active
+          </label>
+
+          <button class="btn-copy px-3 py-1.5 rounded-lg bg-gray-100 text-sm ml-auto" data-id="${q.id}">Copy to form</button>
+        </div>
+
         <div class="mt-3 flex flex-wrap gap-2">
-          <button class="btn-save px-3 py-2 rounded-xl bg-gray-900 text-white text-sm" data-id="${q.id}">Save</button>
+          <button class="btn-save px-3 py-2 rounded-xl bg-gray-900 text-white text-sm" data-id="${q.id}">Save text</button>
           <button class="btn-toggle px-3 py-2 rounded-xl bg-gray-100 text-gray-900 text-sm" data-id="${q.id}">
             ${q.active ? 'Deactivate' : 'Activate'}
           </button>
@@ -270,12 +326,41 @@
         if (error) alert('Update failed: ' + error.message); else alert('Saved')
       }
 
-      // Toggle active
+      // Toggle active (button)
       wrap.querySelector('.btn-toggle').onclick = async (e) => {
         const id = e.currentTarget.dataset.id
         const isActive = wrap.querySelector('span').textContent.trim() === 'active'
         const { error } = await supabase.from('questions').update({ active: !isActive }).eq('id', id)
         if (error) alert('Toggle failed: ' + error.message); else loadQuestions()
+      }
+
+      // NEW: Active checkbox (instant)
+      wrap.querySelector('.activeChk').onchange = async (e) => {
+        const id = e.currentTarget.dataset.id
+        const { error } = await supabase.from('questions').update({ active: e.currentTarget.checked }).eq('id', id)
+        if (error) alert('Update failed: ' + error.message)
+      }
+
+      // NEW: Level select (instant)
+      wrap.querySelector('.levelSel').onchange = async (e) => {
+        const id = e.currentTarget.dataset.id
+        const level = parseInt(e.currentTarget.value, 10)
+        const { error } = await supabase.from('questions').update({ level }).eq('id', id)
+        if (error) alert('Update failed: ' + error.message)
+      }
+
+      // NEW: Copy to form
+      wrap.querySelector('.btn-copy').onclick = () => {
+        const id = q.id
+        qtext.value = wrap.querySelector(`textarea[data-id="${id}"]`).value
+        qlevel.value = String(q.level ?? 1)
+        qcat.value   = q.category || 'shimedaiko'
+        qactive.value= 'true'
+        copyIdSpan.textContent = id
+        copyHint.classList.remove('hidden')
+        // focus
+        qtext.focus()
+        qtext.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }
 
       // Delete
