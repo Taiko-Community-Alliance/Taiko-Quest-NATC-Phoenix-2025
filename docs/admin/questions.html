@@ -22,17 +22,15 @@
             rows="3" placeholder="e.g., Take a photo with a first-time attendee"></textarea>
         </div>
         <div>
-          <!-- CHANGED to select with fixed tracks -->
           <label for="qcat" class="block text-sm font-medium text-gray-700 mb-1">Category</label>
           <select id="qcat" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5">
             <option value="shimedaiko">Shimedaiko</option>
             <option value="odaiko">Odaiko</option>
-            <option value="chudaiko">Chūdaiko</option>
-            <option value="okedo">Okedō</option>
+            <option value="chudaiko">Chudaiko</option>
+            <option value="okedo">Okedo</option>
           </select>
         </div>
         <div>
-          <!-- LEVEL now 1–4 numerics -->
           <label for="qlevel" class="block text-sm font-medium text-gray-700 mb-1">Level</label>
           <select id="qlevel" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5">
             <option value="1">1 (Easy)</option>
@@ -55,7 +53,6 @@
         </div>
       </div>
       <p id="createMsg" class="text-sm text-gray-600 mt-2"></p>
-      <!-- NEW: Copy hint -->
       <p id="copyHint" class="text-xs text-gray-500 mt-1 hidden">Prefilled from #<span id="copyId"></span></p>
     </section>
 
@@ -71,7 +68,6 @@
           </select>
         </div>
         <div>
-          <!-- CHANGED: numeric levels -->
           <label for="filterLevel" class="block text-sm font-medium text-gray-700 mb-1">Level</label>
           <select id="filterLevel" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5">
             <option value="all" selected>All</option>
@@ -82,14 +78,13 @@
           </select>
         </div>
         <div>
-          <!-- NEW: category filter -->
           <label for="filterCategory" class="block text-sm font-medium text-gray-700 mb-1">Category</label>
           <select id="filterCategory" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-2.5">
             <option value="all" selected>All</option>
             <option value="shimedaiko">Shimedaiko</option>
             <option value="odaiko">Odaiko</option>
-            <option value="chudaiko">Chūdaiko</option>
-            <option value="okedo">Okedō</option>
+            <option value="chudaiko">Chudaiko</option>
+            <option value="okedo">Okedo</option>
           </select>
         </div>
         <div class="sm:col-span-2">
@@ -135,51 +130,47 @@
     })
     initHeader()
     const supabase = supaFromConfig()
-    const ADMIN_DOMAIN = '@taikocommunityalliance.org' // optional UI gate; RLS still enforces
+    const ADMIN_DOMAIN = null // optional UI gate; RLS still enforces
 
-    // Mobile elements
+    // Mobile elements (from header)
     const whoami = document.getElementById('whoami')
     const signin = document.getElementById('signin')
     const signout = document.getElementById('signout')
-
-    // Common elements
     const menuBtn = document.getElementById('menuBtn')
     const mobileMenu = document.getElementById('mobileMenu')
+
+    // Sections
     const createBox = document.getElementById('createBox')
     const controls = document.getElementById('controls')
     const listBox = document.getElementById('listBox')
     const qlist = document.getElementById('qlist')
 
+    // Create form
     const qtext = document.getElementById('qtext')
     const qcat = document.getElementById('qcat')
     const qlevel = document.getElementById('qlevel')
     const qactive = document.getElementById('qactive')
     const createBtn = document.getElementById('createBtn')
     const createMsg = document.getElementById('createMsg')
-    const copyHint = document.getElementById('copyHint') // NEW
-    const copyIdSpan = document.getElementById('copyId') // NEW
+    const copyHint = document.getElementById('copyHint')
+    const copyIdSpan = document.getElementById('copyId')
 
+    // Filters
     const filterActive = document.getElementById('filterActive')
     const filterLevel = document.getElementById('filterLevel')
-    const filterCategory = document.getElementById('filterCategory') // NEW
+    const filterCategory = document.getElementById('filterCategory')
     const searchText = document.getElementById('searchText')
     const refreshBtn = document.getElementById('refreshBtn')
     const prevBtn = document.getElementById('prevBtn')
     const nextBtn = document.getElementById('nextBtn')
     const pageInfo = document.getElementById('pageInfo')
 
-    // Toggle mobile menu
     if (menuBtn && mobileMenu) {
-      menuBtn.addEventListener('click', () => {
-        mobileMenu.classList.toggle('hidden')
-      })
+      menuBtn.addEventListener('click', () => mobileMenu.classList.toggle('hidden'))
     }
 
-    const handleSignIn = () => signInGoogle(supabase)
-    const handleSignOut = () => signOut(supabase)
-
-    signin.onclick = handleSignIn
-    signout.onclick = handleSignOut
+    signin.onclick = () => signInGoogle(supabase)
+    signout.onclick = () => signOut(supabase)
 
     let page = 1
     const PAGE_SIZE = 20
@@ -208,8 +199,8 @@
       createBtn.disabled = false
       if (error) { createMsg.textContent = 'Error: ' + error.message; return }
       createMsg.textContent = 'Saved!'
-      qtext.value = ''; qcat.value = 'shimedaiko'; qlevel.value = '1'; qactive.value = 'true' // CHANGED defaults
-      copyHint.classList.add('hidden') // NEW
+      qtext.value = ''; qcat.value = 'shimedaiko'; qlevel.value = '1'; qactive.value = 'true'
+      copyHint.classList.add('hidden')
       await loadQuestions()
       setTimeout(() => (createMsg.textContent = ''), 1500)
     })
@@ -218,7 +209,7 @@
     refreshBtn.onclick = () => { page = 1; loadQuestions() }
     filterActive.onchange = () => { page = 1; loadQuestions() }
     filterLevel.onchange  = () => { page = 1; loadQuestions() }
-    filterCategory.onchange = () => { page = 1; loadQuestions() } // NEW
+    filterCategory.onchange = () => { page = 1; loadQuestions() }
     searchText.oninput    = () => { page = 1; loadQuestions() }
     prevBtn.onclick = () => { if (page > 1) { page--; loadQuestions() } }
     nextBtn.onclick = () => { if ((page * PAGE_SIZE) < lastCount) { page++; loadQuestions() } }
@@ -237,7 +228,6 @@
         q = q.eq('level', lvl)
       }
 
-      // NEW: Category filter
       if (filterCategory.value !== 'all') {
         q = q.eq('category', filterCategory.value)
       }
@@ -269,7 +259,7 @@
       return `<div class="bg-white rounded-2xl ring-1 ring-red-300 p-6 text-red-700">Error: ${msg}</div>`
     }
 
-    const TRACK_LABEL = { shimedaiko:'Shimedaiko', odaiko:'Odaiko', chudaiko:'Chūdaiko', okedo:'Okedō' }
+    const TRACK_LABEL = { shimedaiko:'Shimedaiko', odaiko:'Odaiko', chudaiko:'Chudaiko', okedo:'Okedo' }
     const LEVEL_LABEL = { 1:'1 (Easy)', 2:'2 (Medium)', 3:'3 (Hard)', 4:'4 (Expert)' }
 
     function renderQuestionCard(q) {
@@ -291,7 +281,6 @@
           <textarea data-id="${q.id}" class="w-full rounded-xl border-gray-300 focus:border-gray-900 focus:ring-gray-900 p-3" rows="3">${q.text}</textarea>
         </div>
 
-        <!-- NEW: Inline controls row -->
         <div class="mt-3 flex flex-wrap items-center gap-2">
           <label class="text-xs flex items-center gap-1">
             Level:
@@ -334,14 +323,14 @@
         if (error) alert('Toggle failed: ' + error.message); else loadQuestions()
       }
 
-      // NEW: Active checkbox (instant)
+      // Active checkbox (instant)
       wrap.querySelector('.activeChk').onchange = async (e) => {
         const id = e.currentTarget.dataset.id
         const { error } = await supabase.from('questions').update({ active: e.currentTarget.checked }).eq('id', id)
         if (error) alert('Update failed: ' + error.message)
       }
 
-      // NEW: Level select (instant)
+      // Level select (instant)
       wrap.querySelector('.levelSel').onchange = async (e) => {
         const id = e.currentTarget.dataset.id
         const level = parseInt(e.currentTarget.value, 10)
@@ -349,7 +338,7 @@
         if (error) alert('Update failed: ' + error.message)
       }
 
-      // NEW: Copy to form
+      // Copy to form
       wrap.querySelector('.btn-copy').onclick = () => {
         const id = q.id
         qtext.value = wrap.querySelector(`textarea[data-id="${id}"]`).value
@@ -358,7 +347,6 @@
         qactive.value= 'true'
         copyIdSpan.textContent = id
         copyHint.classList.remove('hidden')
-        // focus
         qtext.focus()
         qtext.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }
