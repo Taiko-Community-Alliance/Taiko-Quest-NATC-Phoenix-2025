@@ -124,7 +124,7 @@
       await import('../js/admin-common.js')
 
     const supabase = supaFromConfig()
-    bindAuthButtons({
+    bindAuthButtons(supabase, {
       onSignIn: () => signInGoogle(supabase),
       onSignOut: () => signOut(supabase)
     })
@@ -157,7 +157,7 @@
 
     // Guard
     const guard = await requireAdmin(supabase, null, { signinBtn: signin, signoutBtn: signout, whoami })
-    if (!guard.admin) { window.location.replace('../request.html') }
+    if (!guard.admin) { window.location.replace('../access.html') }
 
     // Reveal UI
     createBox.classList.remove('hidden')

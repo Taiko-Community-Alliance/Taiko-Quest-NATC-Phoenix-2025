@@ -14,45 +14,49 @@ export function renderHeader({ admin = false, nav = [], withAuth = false } = {})
 
   const authHTML = withAuth ? `
     <span id="whoami" class="hidden sm:inline text-sm text-gray-600">Checking session…</span>
-    <button id="signin" class="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">Sign in</button>
-    <button id="signout" class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 text-sm hidden">Sign out</button>
+    <button id="signin" type="button" class="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">Sign in</button>
+    <button id="signout" type="button" class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 text-sm hidden">Sign out</button>
   ` : ''
 
   return `
-<header class="bg-white shadow-sm">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-    <!-- Title row -->
-    <div class="flex items-center justify-between">
-      <a href="${homeHref}" class="flex items-center gap-2 group">
-        <img src="${logoSrc}" alt="TCA" class="h-8 sm:h-10 w-auto">
-        <span class="text-lg sm:text-xl md:text-2xl font-semibold text-gray-900 group-hover:underline">${title}</span>
-      </a>
-
-      <button id="menuBtn" class="sm:hidden inline-flex items-center justify-center p-2 rounded-md ring-1 ring-gray-300" aria-label="Open menu">☰</button>
-
-      <div class="hidden sm:flex items-center gap-2">
-        ${links}
-        ${withAuth ? `
-          <span id="whoami" class="js-whoami text-sm text-gray-600">Checking session…</span>
-          <button id="signin" class="js-signin hidden px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">Sign in</button>
-          <button id="signout" class="js-signout hidden px-3 py-2 rounded-lg bg-gray-200 text-gray-900 text-sm">Sign out</button>
-        ` : ''}
+<header class="bg-white/90 backdrop-blur shadow-sm">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+    <a href="${home}" class="group flex items-center gap-3">
+      <img src="${base}/assets/brand/TCA-Logo.png" alt="TCA Logo" class="h-8 w-auto" onerror="this.style.display='none'">
+      <div>
+        <div class="font-semibold text-lg group-hover:underline">Taiko Quest · NATC Phoenix 2025</div>
+        <div class="text-xs text-gray-600">Taiko Community Alliance</div>
       </div>
-    </div>
-    <!-- Subheader -->
-    <div class="mt-1 text-xs text-gray-500">Taiko Community Alliance</div>
+    </a>
+
+    <!-- Desktop nav -->
+    <nav class="hidden sm:flex items-center gap-2">
+      ${navLinks}
+      ${authHTML}
+    </nav>
+
+    <!-- Mobile controls -->
+    <button id="menuBtn" class="sm:hidden p-2 rounded-lg border border-gray-200" aria-label="Open menu" aria-controls="mobileNav" aria-expanded="false">
+      <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+    </button>
   </div>
 
-  <!-- Mobile menu -->
-  <div id="mobileMenu" class="sm:hidden hidden border-t border-gray-200">
-    <div class="px-4 py-3 space-y-2">
-      ${links ? `<nav class="flex flex-col gap-1">${links}</nav>` : ''}
+  <!-- Mobile nav -->
+  <div id="mobileNav" class="sm:hidden hidden border-t border-gray-100">
+    <div class="px-4 py-3 flex flex-col gap-2">
+      ${nav.map(([label, href]) =>
+        `<a href="${href}" class="px-3 py-2 rounded-lg hover:bg-gray-100 text-sm">${escapeHtml(label)}</a>`
+      ).join('')}
       ${withAuth ? `
         <div class="flex items-center gap-2 pt-2">
-          <!-- Use a UNIQUE id here to avoid duplicate IDs -->
           <span id="whoamiMobile" class="text-sm text-gray-600">Checking session…</span>
-          <!-- We intentionally DO NOT duplicate signin/signout buttons on mobile to keep IDs unique.
-               The sign-in/out actions remain available from the desktop row even on mobile via menu. -->
+        </div>
+        <div class="flex gap-2 pt-2">
+          <!-- Mobile auth buttons (class-based; avoid duplicate IDs) -->
+          <button type="button" class="js-signin px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">Sign in</button>
+          <button type="button" class="js-signout px-3 py-2 rounded-lg bg-gray-200 text-gray-900 text-sm hidden">Sign out</button>
         </div>` : ``}
     </div>
   </div>
@@ -71,7 +75,7 @@ export function initHeader() {
 }
 
 /**
- * Bind header auth UI to Supabase auth state (user pages).
+ * Bind header auth UI to Supabase auth state (USER pages, OTP flow).
  * - Shows email in #whoami / #whoamiMobile
  * - Toggles Sign in / Sign out
  * - Optional signInHref for OTP pages (default ./access.html)
@@ -81,50 +85,82 @@ export function bindAuthHeader(supabase, { signInHref = './access.html', onSignO
     ...document.querySelectorAll('#whoami'),
     ...document.querySelectorAll('#whoamiMobile')
   ]
-  const signinBtn  = document.getElementById('signin')
-  const signoutBtn = document.getElementById('signout')
+  const signInEls  = [
+    ...document.querySelectorAll('#signin'),
+    ...document.querySelectorAll('.js-signin')
+  ]
+  const signOutEls = [
+    ...document.querySelectorAll('#signout'),
+    ...document.querySelectorAll('.js-signout')
+  ]
 
   function render(user) {
     const isAuthed = !!user
-    // Toggle buttons
-    if (signinBtn) signinBtn.classList.toggle('hidden', isAuthed)
-    if (signoutBtn) signoutBtn.classList.toggle('hidden', !isAuthed)
-    // Update whoami text / visibility
+    // Toggle buttons (desktop + mobile)
+    signInEls.forEach(el => el.classList.toggle('hidden', isAuthed))
+    signOutEls.forEach(el => el.classList.toggle('hidden', !isAuthed))
+    // Whoami label(s)
     const label = isAuthed ? (user.email || 'Signed in') : 'Not signed in'
     whoamiEls.forEach(el => {
       if (!el) return
       el.textContent = label
-      // Show on mobile and desktop only when authed; keep hidden otherwise on desktop
-      if (el.id === 'whoami') {
-        el.classList.toggle('hidden', !isAuthed)
-      }
+      if (el.id === 'whoami') el.classList.toggle('hidden', !isAuthed)
     })
   }
 
-  // Initial render
   supabase.auth.getUser().then(({ data: { user } }) => render(user))
-
-  // React to changes (after OTP redirect, etc.)
-  supabase.auth.onAuthStateChange((_event, session) => {
-    render(session?.user || null)
-  })
+  supabase.auth.onAuthStateChange((_event, session) => render(session?.user || null))
 
   // Actions
-  if (signinBtn) {
-    signinBtn.onclick = () => {
-      // For attendees we use OTP, so send them to access page
-      window.location.assign(signInHref)
-    }
+  signInEls.forEach(btn => btn.onclick = () => window.location.assign(signInHref))
+  signOutEls.forEach(btn => btn.onclick = async () => {
+    await supabase.auth.signOut()
+    render(null)
+    if (typeof onSignOut === 'function') onSignOut()
+    else window.location.assign('./index.html')
+  })
+}
+
+/**
+ * Bind header buttons for ADMIN pages (Google OAuth), backward-compatible.
+ * Keeps your legacy style:
+ *   bindAuthButtons(supabase, { onSignIn: () => signInGoogle(supabase),
+ *                                onSignOut: () => signOut(supabase) })
+ * and also toggles mobile .js-signin/.js-signout.
+ */
+export function bindAuthButtons(supabase, { onSignIn, onSignOut } = {}) {
+  const whoamiEls = [
+    ...document.querySelectorAll('#whoami'),
+    ...document.querySelectorAll('#whoamiMobile')
+  ]
+  const signInEls  = [
+    ...document.querySelectorAll('#signin'),
+    ...document.querySelectorAll('.js-signin')
+  ]
+  const signOutEls = [
+    ...document.querySelectorAll('#signout'),
+    ...document.querySelectorAll('.js-signout')
+  ]
+
+  function render(user) {
+    const isAuthed = !!user
+    signInEls.forEach(el => el.classList.toggle('hidden', isAuthed))
+    signOutEls.forEach(el => el.classList.toggle('hidden', !isAuthed))
+    const label = isAuthed ? (user.email || 'Signed in') : 'Not signed in'
+    whoamiEls.forEach(el => {
+      if (!el) return
+      el.textContent = label
+      if (el.id === 'whoami') el.classList.toggle('hidden', !isAuthed)
+    })
   }
-  if (signoutBtn) {
-    signoutBtn.onclick = async () => {
-      await supabase.auth.signOut()
-      render(null)
-      if (typeof onSignOut === 'function') onSignOut()
-      // Default behavior: bring them home
-      else window.location.assign('./index.html')
-    }
-  }
+
+  // Initial + reactive
+  supabase.auth.getUser().then(({ data: { user } }) => render(user))
+  supabase.auth.onAuthStateChange((_evt, session) => render(session?.user || null))
+
+  // Click handlers (legacy callbacks)
+  signInEls.forEach(btn => btn.onclick = () => onSignIn?.())
+  signOutEls.forEach(btn => btn.onclick = () => onSignOut?.())
 }
 
 function escapeHtml(s='') {
