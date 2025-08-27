@@ -1,16 +1,22 @@
 // docs/js/header.js
-export function renderHeader({
-  admin = false,
-  nav = [],
-  withAuth = true,
-  // Defaults: user pages → ./index.html, ./assets/... ; admin pages → ../index.html, ../assets/...
-  homeHref = admin ? '../index.html' : './index.html',
-  logoSrc  = admin ? '../assets/brand/TCA-Logo.png' : './assets/brand/TCA-Logo.png',
-  title    = 'Taiko Quest NATC Phoenix 2025',
-} = {}) {
-  const links = (nav || [])
-    .map(([label, href]) => `<a href="${href}" class="text-sm text-gray-700 hover:text-gray-900 px-2 py-1">${label}</a>`)
-    .join('')
+// Injects a responsive header with "Taiko Quest" (link) + "Taiko Community Alliance" subheader.
+// Use `admin: true` on /docs/admin/* pages to fix relative paths.
+// Pass `nav` as an array of [label, href]. Set `withAuth: true` to render
+// placeholders with IDs: #whoami, #signin, #signout (your auth code can bind to these).
+
+export function renderHeader({ admin = false, nav = [], withAuth = false } = {}) {
+  const base = admin ? '..' : '.'
+  const home = admin ? '../index.html' : './index.html'
+
+  const navLinks = nav.map(([label, href]) =>
+    `<a href="${href}" class="px-3 py-2 rounded-lg hover:bg-gray-100 text-sm">${escapeHtml(label)}</a>`
+  ).join('')
+
+  const authHTML = withAuth ? `
+    <span id="whoami" class="hidden sm:inline text-sm text-gray-600">Checking session…</span>
+    <button id="signin" class="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">Sign in</button>
+    <button id="signout" class="px-3 py-2 rounded-lg bg-gray-200 text-gray-900 text-sm hidden">Sign out</button>
+  ` : ''
 
   return `
 <header class="bg-white shadow-sm">
@@ -42,14 +48,12 @@ export function renderHeader({
     <div class="px-4 py-3 space-y-2">
       ${links ? `<nav class="flex flex-col gap-1">${links}</nav>` : ''}
       ${withAuth ? `
-        <div class="flex items-center justify-between pt-2">
-          <span class="js-whoami text-sm text-gray-600">Checking session…</span>
-          <div class="flex gap-2">
-            <button class="js-signin hidden px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">Sign in</button>
-            <button class="js-signout hidden px-3 py-2 rounded-lg bg-gray-200 text-gray-900 text-sm">Sign out</button>
-          </div>
-        </div>
-      ` : ''}
+        <div class="flex items-center gap-2 pt-2">
+          <!-- Use a UNIQUE id here to avoid duplicate IDs -->
+          <span id="whoamiMobile" class="text-sm text-gray-600">Checking session…</span>
+          <!-- We intentionally DO NOT duplicate signin/signout buttons on mobile to keep IDs unique.
+               The sign-in/out actions remain available from the desktop row even on mobile via menu. -->
+        </div>` : ``}
     </div>
   </div>
 </header>`
@@ -57,22 +61,72 @@ export function renderHeader({
 
 export function initHeader() {
   const btn = document.getElementById('menuBtn')
-  const menu = document.getElementById('mobileMenu')
-  if (btn && menu) btn.addEventListener('click', () => menu.classList.toggle('hidden'))
+  const mobile = document.getElementById('mobileNav')
+  if (!btn || !mobile) return
+  btn.addEventListener('click', () => {
+    const isOpen = !mobile.classList.contains('hidden')
+    mobile.classList.toggle('hidden', isOpen)
+    btn.setAttribute('aria-expanded', String(!isOpen))
+  })
 }
 
-/** Hook up the header’s auth buttons for desktop + mobile */
-export function bindAuthButtons({ onSignIn, onSignOut } = {}) {
-  const all = (sel) => Array.from(document.querySelectorAll(sel)).filter(Boolean)
-  all('#signin, .js-signin').forEach(b => { if (onSignIn) b.onclick = onSignIn })
-  all('#signout, .js-signout').forEach(b => { if (onSignOut) b.onclick = onSignOut })
+/**
+ * Bind header auth UI to Supabase auth state (user pages).
+ * - Shows email in #whoami / #whoamiMobile
+ * - Toggles Sign in / Sign out
+ * - Optional signInHref for OTP pages (default ./access.html)
+ */
+export function bindAuthHeader(supabase, { signInHref = './access.html', onSignOut } = {}) {
+  const whoamiEls = [
+    ...document.querySelectorAll('#whoami'),
+    ...document.querySelectorAll('#whoamiMobile')
+  ]
+  const signinBtn  = document.getElementById('signin')
+  const signoutBtn = document.getElementById('signout')
+
+  function render(user) {
+    const isAuthed = !!user
+    // Toggle buttons
+    if (signinBtn) signinBtn.classList.toggle('hidden', isAuthed)
+    if (signoutBtn) signoutBtn.classList.toggle('hidden', !isAuthed)
+    // Update whoami text / visibility
+    const label = isAuthed ? (user.email || 'Signed in') : 'Not signed in'
+    whoamiEls.forEach(el => {
+      if (!el) return
+      el.textContent = label
+      // Show on mobile and desktop only when authed; keep hidden otherwise on desktop
+      if (el.id === 'whoami') {
+        el.classList.toggle('hidden', !isAuthed)
+      }
+    })
+  }
+
+  // Initial render
+  supabase.auth.getUser().then(({ data: { user } }) => render(user))
+
+  // React to changes (after OTP redirect, etc.)
+  supabase.auth.onAuthStateChange((_event, session) => {
+    render(session?.user || null)
+  })
+
+  // Actions
+  if (signinBtn) {
+    signinBtn.onclick = () => {
+      // For attendees we use OTP, so send them to access page
+      window.location.assign(signInHref)
+    }
+  }
+  if (signoutBtn) {
+    signoutBtn.onclick = async () => {
+      await supabase.auth.signOut()
+      render(null)
+      if (typeof onSignOut === 'function') onSignOut()
+      // Default behavior: bring them home
+      else window.location.assign('./index.html')
+    }
+  }
 }
 
-/** Optional: quickly set the header’s auth state text/buttons */
-export function setHeaderAuthUI({ loggedIn, label = 'Signed in' }) {
-  const who = document.querySelectorAll('.js-whoami, #whoami')
-  who.forEach(el => el && (el.textContent = loggedIn ? `Signed in as ${label}` : 'Not signed in'))
-  const show = (sel, show) => document.querySelectorAll(sel).forEach(el => el && el.classList.toggle('hidden', !show))
-  show('#signin, .js-signin', !loggedIn)
-  show('#signout, .js-signout', loggedIn)
+function escapeHtml(s='') {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 }

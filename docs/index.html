@@ -21,8 +21,7 @@
             Join the conference-wide scavenger quest. Complete prompts, upload photo/video proof, and share your board!
           </p>
           <div class="mt-5 flex flex-wrap gap-2">
-            <a href="./request.html" class="px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm">Request Access</a>
-            <a href="./access.html" class="px-4 py-2.5 rounded-xl bg-gray-100 text-sm">Access My Board</a>
+            <a href="./access.html" class="px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm">Access My Board</a>
           </div>
           <p class="mt-3 text-xs text-gray-500">Need details? See our <a class="underline" href="./TERMS.html">Terms</a> and <a class="underline" href="./PRIVACY.html">Privacy</a>.</p>
         </div>
@@ -41,10 +40,6 @@
         <div class="font-medium">Access My Board</div>
         <p class="text-sm text-gray-600 mt-1">Sign in by email magic link.</p>
       </a>
-      <a href="./request.html" class="block bg-white rounded-2xl ring-1 ring-black/5 p-4 hover:ring-gray-300 transition">
-        <div class="font-medium">Request Access</div>
-        <p class="text-sm text-gray-600 mt-1">Not approved yet? Submit your info.</p>
-      </a>
       <a href="./admin/index.html" class="block bg-white rounded-2xl ring-1 ring-black/5 p-4 hover:ring-gray-300 transition">
         <div class="font-medium">Admin Portal</div>
         <p class="text-sm text-gray-600 mt-1">For TCA coordinators (Google auth).</p>
@@ -61,8 +56,8 @@
     document.getElementById('siteHeader').outerHTML = renderHeader({
         admin: false,
         nav: [
-            ['Request Access', './request.html'],
-            ['Access My Board', './access.html'],
+          ['Home', './index.html'],
+          ['Access', './access.html'],
         ],
         withAuth: false
     })
