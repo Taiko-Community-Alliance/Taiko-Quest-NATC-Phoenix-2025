@@ -48,7 +48,7 @@
       await import('../js/admin-common.js')
 
     const supabase = supaFromConfig()
-    bindAuthButtons({
+    bindAuthButtons(supabase, {
       onSignIn: () => signInGoogle(supabase),
       onSignOut: () => signOut(supabase)
     })

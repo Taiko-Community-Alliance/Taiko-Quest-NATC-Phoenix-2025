@@ -45,7 +45,7 @@
       await import('../js/admin-common.js')
 
     const supabase = supaFromConfig()
-    bindAuthButtons({
+    bindAuthButtons(supabase, {
       onSignIn: () => signInGoogle(supabase),
       onSignOut: () => signOut(supabase)
     })
@@ -60,7 +60,7 @@
     const refreshBtn = document.getElementById('refreshBtn')
 
     const guard = await requireAdmin(supabase, null, { signinBtn: signin, signoutBtn: signout, whoami })
-    if (!guard.admin) { window.location.replace('../request.html') }
+    if (!guard.admin) { window.location.replace('../access.html') }
 
     content.classList.remove('hidden')
     refreshBtn.onclick = load

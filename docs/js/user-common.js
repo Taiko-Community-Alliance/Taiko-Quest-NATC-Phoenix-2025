@@ -39,12 +39,6 @@ export function todayStrAZ() {
   return todayStrTZ('America/Phoenix')
 }
 
-// Back-compat: some pages still import todayStrNY(); map it to Phoenix.
-export function todayStrNY() {
-  console.warn('[user-common] todayStrNY() is deprecated; returning Phoenix date.')
-  return todayStrAZ()
-}
-
 /* -------------------------------------------------------
  * Auth / Profile / Gate
  * ----------------------------------------------------- */
