@@ -52,7 +52,7 @@ export async function requireAdmin(supabase, ADMIN_DOMAIN, els) {
   return { user, profile, admin: isAdmin }
 }
 
-export async function requireAdminOrRedirect(supabase, { adminDomain, requireApproved = false, redirectTo = '.../request.html', els} = {}) {
+export async function requireAdminOrRedirect(supabase, { adminDomain, requireApproved = false, redirectTo = '.../access.html', els} = {}) {
   const { user, profile, isAdmin, displayName } = await getSessionProfileAndAdmin(supabase, adminDomain)
   updateAuthUI(user ? {name: displayName, email: user?.email} : null, els)
   if (!user) return { user: null, profile: null, admin: false, redirect: false }

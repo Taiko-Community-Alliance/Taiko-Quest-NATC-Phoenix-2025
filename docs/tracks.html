@@ -1,190 +1,205 @@
-<!doctype html>
-<html lang="en" class="h-full bg-gray-50">
+<!-- docs/tracks.html -->
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Choose Today’s Track · Taiko Quest NATC Phoenix 2025</title>
-  <link rel="stylesheet" href="./assets/tailwind.css" />
+  <link rel="stylesheet" href="./assets/tailwind.css">
   <script src="./config.js"></script>
 </head>
-<body class="min-h-screen bg-gray-50">
-  <!-- Header (injected) -->
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
   <div id="siteHeader"></div>
+  <main class="px-4 py-8 space-y-4">
 
-  <main class="max-w-5xl mx-auto p-4 sm:p-6">
-    <header class="mb-4">
-      <h1 class="text-2xl sm:text-3xl font-semibold">Choose Today’s Track</h1>
-      <p class="text-sm text-gray-600">
-        You can unlock <span class="font-medium">one</span> track per day. Each board has 4 quests + 1 bonus.
-      </p>
-    </header>
+    <!-- Day header (shows Day 1, D-1, etc.) -->
+    <div class="text-center mb-4">
+      <div id="dayLabel" class="text-2xl font-bold"></div>
+      <div id="dayDate" class="text-xs text-gray-500 dark:text-gray-400"></div>
+    </div>
 
-    <!-- Today section -->
-    <section class="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-4 sm:p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-medium">Today: <span id="todayStr" class="text-gray-600"></span></h2>
-        <span id="todayStatus" class="text-sm text-gray-600"></span>
+    <h1 class="text-3xl font-bold text-center">Choose Today’s Track</h1>
+    <p class="text-center text-sm text-gray-600 dark:text-gray-400">
+      You can unlock one track per day. Each board has 4 missions + 1 secret bonus.
+    </p>
+
+    <!-- Tracks grid (responsive squares) -->
+    <div id="tracksGrid" class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+
+    <section class="space-y-6">
+      <div>
+        <h2 class="text-xl font-semibold">Your Track Progress</h2>
+        <button id="refreshProgress" class="ml-2 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200">Refresh</button>
+        <div id="progressList" class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
       </div>
-
-      <div id="tracksGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <!-- cards inserted -->
+      <div>
+        <h2 class="text-xl font-semibold">Recent Boards</h2>
+        <button id="refreshHistory" class="ml-2 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200">Refresh</button>
+        <div id="history" class="mt-3 space-y-2"></div>
       </div>
-    </section>
-
-    <!-- Progress across days -->
-    <section class="mt-6 bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-4 sm:p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-medium">Your Track Progress</h2>
-        <button id="refreshProgress" class="px-3 py-2 rounded-lg bg-gray-100 text-sm">Refresh</button>
-      </div>
-      <div id="progressList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
-    </section>
-
-    <!-- History -->
-    <section class="mt-6 bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-4 sm:p-6">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-medium">Recent Boards</h2>
-        <button id="refreshHistory" class="px-3 py-2 rounded-lg bg-gray-100 text-sm">Refresh</button>
-      </div>
-      <div id="history" class="space-y-2 text-sm"></div>
     </section>
   </main>
+  <footer class="py-4 text-center text-xs text-gray-500 dark:text-gray-400">
+    © <span id="y"></span> Taiko Community Alliance
+  </footer>
 
   <script type="module">
-    import { renderHeader, initHeader } from './js/header.js'
+    import { renderHeader, initHeader, bindAuthHeader } from './js/header.js';
     import {
-      supaFromConfig, requireApprovedOrRedirect, ensureProfile, signOut,
+      supaFromConfig, requireApprovedOrRedirect, ensureProfile,
       todayStrAZ, listBoardsForDay, listRecentBoards,
       ensureTrackBoardForToday, trackStatsForUser
-    } from './js/user-common.js'
+    } from './js/user-common.js';
 
-    // Inject header (with auth controls)
+    // Insert header
     document.getElementById('siteHeader').outerHTML = renderHeader({
       admin: false,
-      nav: [['Home','./index.html'], ['My Board','./board.html']],
+      nav: [['Home', './index.html'], ['My Board', './board.html']],
       withAuth: true
-    })
-    initHeader()
+    });
+    initHeader();
 
-    const supabase = supaFromConfig()
-    document.getElementById('signout')?.addEventListener('click', async () => {
-      await signOut(supabase); location.href='./access.html'
-    })
+    const supabase = supaFromConfig();
+    bindAuthHeader(supabase, { signInHref: './access.html' })
 
-    // Config
-    const DAILY_LIMIT = 1
+    // Conference start (America/Phoenix)
+    const CONF_START = new Date('2025-08-29T00:00:00-07:00');
+    const MAX_DAYS   = 4;
+
+    // Elements
+    const dayLabel     = document.getElementById('dayLabel');
+    const dayDate      = document.getElementById('dayDate');
+    const tracksGrid   = document.getElementById('tracksGrid');
+    const progressList = document.getElementById('progressList');
+    const historyBox   = document.getElementById('history');
+    const refreshProgress = document.getElementById('refreshProgress');
+    const refreshHistory  = document.getElementById('refreshHistory');
+
     const TRACKS = [
-      { key:'shimedaiko', label:'Shimedaiko' },
-      { key:'odaiko',     label:'Odaiko' },
-      { key:'chudaiko',   label:'Chūdaiko' },
-      { key:'okedo',      label:'Okedō' },
-    ]
+      { key: 'shimedaiko', label: 'Shimedaiko' },
+      { key: 'odaiko',     label: 'Odaiko' },
+      { key: 'chudaiko',   label: 'Chūdaiko' },
+      { key: 'okedo',      label: 'Okedō' },
+    ];
+    const DAILY_LIMIT = 1;
 
-    const todayLbl         = document.getElementById('todayStr')
-    const todayStatus      = document.getElementById('todayStatus')
-    const grid             = document.getElementById('tracksGrid')
-    const progressList     = document.getElementById('progressList')
-    const refreshProgress  = document.getElementById('refreshProgress')
-    const historyBox       = document.getElementById('history')
-    const refreshHistory   = document.getElementById('refreshHistory')
+    (async () => {
+      const guard = await requireApprovedOrRedirect(supabase, { redirectTo: './access.html' });
+      if (guard.redirected) return;
+      const { user } = await ensureProfile(supabase);
 
-    ;(async () => {
-      const guard = await requireApprovedOrRedirect(supabase, { redirectTo: './access.html' })
-      if (guard.redirected) return
+      // Determine Phoenix date
+      const nowPhoenix = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Phoenix' }));
+      const midnight   = new Date(nowPhoenix.getFullYear(), nowPhoenix.getMonth(), nowPhoenix.getDate());
+      const dayOffset  = Math.floor((midnight - CONF_START) / (24 * 60 * 60 * 1000)) + 1;
+      // Set day label
+      if (dayOffset >= 1) {
+        dayLabel.textContent = `Day ${dayOffset}`;
+      } else {
+        dayLabel.textContent = `D-${Math.abs(dayOffset)}`;
+      }
+      dayDate.textContent = `${midnight.getMonth()+1}/${midnight.getDate()}`;
 
-      const { user } = await ensureProfile(supabase)
-      const today = todayStrAZ()
-      todayLbl.textContent = today
+      // Check if conference over (after day 4)
+      const conferenceEnded = (dayOffset > MAX_DAYS);
 
-      // Boards opened today (any track)
-      const todayBoards = await listBoardsForDay(supabase, user.id, today)
-      const canOpenMoreToday = (todayBoards.length < DAILY_LIMIT)
-      todayStatus.textContent = canOpenMoreToday
-        ? `You can unlock ${DAILY_LIMIT - todayBoards.length} track today.`
-        : `Daily limit reached.`
+      // Boards opened today
+      const todayStr = todayStrAZ();
+      const todayBoards = await listBoardsForDay(supabase, user.id, todayStr);
+      const canOpenMoreToday = (todayBoards.length < DAILY_LIMIT);
 
-      // Map today's boards by track
-      const todayByTrack = Object.fromEntries((todayBoards || []).map(b => [b.track, b]))
+      // Map by track
+      const mapToday = Object.fromEntries((todayBoards || []).map(b => [b.track, b]));
 
-      // Always render 4 track cards
-      grid.innerHTML = ''
+      // Render track cards (square)
+      tracksGrid.innerHTML = '';
       TRACKS.forEach(tr => {
-        const existing = todayByTrack[tr.key] || null
-        const card = document.createElement('div')
-        card.className = 'rounded-xl ring-1 ring-black/5 p-4 bg-white flex flex-col'
+        const existing = mapToday[tr.key] || null;
+        const card = document.createElement('div');
+        card.className = 'flex flex-col items-center justify-between aspect-square rounded-xl ring-1 ring-black/5 dark:ring-gray-700 p-4 bg-white dark:bg-gray-800';
         card.innerHTML = `
-          <div class="text-lg font-semibold mb-1">${tr.label}</div>
-          <div class="text-xs text-gray-500 mb-3">${existing ? 'Unlocked for today' : 'Locked for today'}</div>
-          <div class="mt-auto flex gap-2">
-            ${existing
-              ? `<a href="./board.html?board=${existing.id}" class="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">Continue</a>`
-              : canOpenMoreToday
-                ? `<button class="btn-start px-3 py-2 rounded-lg bg-gray-900 text-white text-sm" data-track="${tr.key}">Start</button>`
-                : `<span class="text-sm text-gray-500">Check back tomorrow</span>`
+          <div class="text-lg font-semibold">${tr.label}</div>
+          <div class="text-xs text-gray-500 dark:text-gray-400">${existing ? 'Unlocked for today' : (conferenceEnded ? 'Conference ended' : 'Locked for today')}</div>
+          <div class="w-full mt-auto">
+            ${
+              existing
+                ? `<a href="./board.html?board=${existing.id}" class="block w-full px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-center text-sm">Continue</a>`
+                : (
+                    (!conferenceEnded && canOpenMoreToday)
+                      ? `<button class="btn-start block w-full px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-sm" data-track="${tr.key}">Start</button>`
+                      : `<span class="block w-full text-sm text-gray-500 dark:text-gray-400 text-center">${conferenceEnded ? 'Check back next year' : 'Check back tomorrow'}</span>`
+                  )
             }
           </div>
-        `
-        grid.appendChild(card)
-      })
+        `;
+        tracksGrid.appendChild(card);
+      });
 
-      // Wire “Start”
-      grid.querySelectorAll('.btn-start').forEach(btn => {
+      // Start track logic
+      tracksGrid.querySelectorAll('.btn-start').forEach(btn => {
         btn.addEventListener('click', async (e) => {
-          const track = e.currentTarget.dataset.track
-          try {
-            const board = await ensureTrackBoardForToday(supabase, user.id, track)
-            location.href = `./board.html?board=${board.id}`
-          } catch (err) {
-            alert(err.message || 'Could not start track.')
+          // Pre-conference
+          if (dayOffset < 1) {
+            alert('The conference hasn’t started yet.');
+            return;
           }
-        })
-      })
+          // Post-conference
+          if (dayOffset > MAX_DAYS) {
+            alert('The conference has ended.');
+            return;
+          }
+          const track = e.currentTarget.dataset.track;
+          try {
+            const board = await ensureTrackBoardForToday(supabase, user.id, track);
+            location.href = `./board.html?board=${board.id}`;
+          } catch (err) {
+            alert(err.message || 'Could not start track.');
+          }
+        });
+      });
 
-      // Progress (counts by track across days)
+      // Progress and history
       async function loadProgress() {
-        progressList.innerHTML = ''
-        const stats = await trackStatsForUser(supabase, user.id)
+        progressList.innerHTML = '';
+        const stats = await trackStatsForUser(supabase, user.id);
         TRACKS.forEach(tr => {
-          const count = stats[tr.key] ?? 0
-          const tile = document.createElement('div')
-          tile.className = 'rounded-xl ring-1 ring-black/5 p-4 bg-white'
+          const count = stats[tr.key] ?? 0;
+          const tile = document.createElement('div');
+          tile.className = 'rounded-xl ring-1 ring-black/5 dark:ring-gray-700 p-4 bg-white dark:bg-gray-800';
           tile.innerHTML = `
-            <div class="text-sm text-gray-600">${tr.label}</div>
+            <div class="text-sm text-gray-600 dark:text-gray-400">${tr.label}</div>
             <div class="mt-1 text-2xl font-semibold">${count}</div>
-            <div class="text-xs text-gray-500">boards completed</div>
-          `
-          progressList.appendChild(tile)
-        })
+            <div class="text-xs text-gray-500 dark:text-gray-400">boards completed</div>
+          `;
+          progressList.appendChild(tile);
+        });
       }
-
-      // History
       async function loadHistory() {
-        historyBox.innerHTML = '<div class="text-gray-500">Loading…</div>'
-        const boards = await listRecentBoards(supabase, user.id, 12)
-        if (!boards.length) { historyBox.innerHTML = '<div class="text-gray-600">No past boards yet.</div>'; return }
-        historyBox.innerHTML = ''
+        historyBox.innerHTML = '<div class="text-gray-500 dark:text-gray-400">Loading…</div>';
+        const boards = await listRecentBoards(supabase, user.id, 12);
+        if (!boards.length) {
+          historyBox.innerHTML = '<div class="text-gray-600 dark:text-gray-400">No past boards yet.</div>';
+          return;
+        }
+        historyBox.innerHTML = '';
         boards.forEach(b => {
-          const row = document.createElement('div')
-          row.className = 'flex items-center justify-between p-2 rounded-lg ring-1 ring-gray-200'
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between p-2 rounded-lg ring-1 ring-gray-200 dark:ring-gray-700 bg-white dark:bg-gray-800';
           row.innerHTML = `
             <div>
-              <div class="font-medium">${labelForTrack(b.track)}</div>
-              <div class="text-xs text-gray-500">${b.day_date ?? new Date(b.created_at).toLocaleDateString()}</div>
+              <div class="font-medium">${TRACKS.find(t => t.key===b.track)?.label || b.track}</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">${b.day_date ?? new Date(b.created_at).toLocaleDateString()}</div>
             </div>
-            <a href="./board.html?board=${b.id}" class="px-3 py-1.5 rounded-lg bg-gray-100 text-sm">View</a>
-          `
-          historyBox.appendChild(row)
-        })
+            <a href="./board.html?board=${b.id}" class="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100">View</a>
+          `;
+          historyBox.appendChild(row);
+        });
       }
-
-      function labelForTrack(k){
-        return (TRACKS.find(t=>t.key===k)?.label) || (k||'Unknown')
-      }
-
-      refreshHistory.addEventListener('click', loadHistory)
-      refreshProgress.addEventListener('click', loadProgress)
-      await Promise.all([loadProgress(), loadHistory()])
-    })()
+      refreshProgress.addEventListener('click', loadProgress);
+      refreshHistory.addEventListener('click', loadHistory);
+      await Promise.all([loadProgress(), loadHistory()]);
+    })();
+    document.getElementById('y').textContent = new Date().getFullYear();
   </script>
 </body>
 </html>

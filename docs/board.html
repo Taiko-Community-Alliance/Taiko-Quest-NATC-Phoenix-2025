@@ -1,196 +1,239 @@
-<!doctype html>
-<html lang="en" class="h-full bg-gray-50">
+<!-- docs/board.html -->
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Quest Board · Taiko Quest NATC Phoenix 2025</title>
   <link rel="stylesheet" href="./assets/tailwind.css">
   <script src="./config.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </head>
-<body class="h-full">
-  <!-- Header (injected) -->
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
   <div id="siteHeader"></div>
-
-  <main class="max-w-6xl mx-auto p-4 sm:p-6">
-    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <main class="px-4 py-6 space-y-4">
+    <!-- Title & subtitle -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 class="text-2xl sm:text-3xl font-semibold">My Quest Board</h1>
-        <p id="subtitle" class="text-sm text-gray-600">Taiko Quest NATC Phoenix 2025</p>
+        <h1 class="text-3xl font-bold">My Quest Board</h1>
+        <p id="subtitle" class="text-sm text-gray-600 dark:text-gray-400"></p>
       </div>
-      <div class="flex flex-wrap gap-2">
-        <a href="./tracks.html" class="px-3 py-2 rounded-lg bg-gray-100 text-sm">Tracks</a>
-      </div>
-    </header>
+      <a href="./tracks.html" class="mt-2 sm:mt-0 inline-flex items-center px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200">Tracks</a>
+    </div>
 
-    <section class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <div class="text-sm">
-        <span id="progress" class="font-medium">0/0 submitted</span>
-        <span id="verified" class="ml-2 text-gray-600">0 verified</span>
+    <!-- Score & actions -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <span id="progress" class="text-xl font-bold"></span>
+        <!-- verified count still available, but we focus on score -->
       </div>
-      <div class="flex flex-wrap gap-2">
-        <button id="exportBtn" class="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">Export board as image</button>
-        <button id="shareBtn" class="px-3 py-2 rounded-lg bg-gray-100 text-sm">Share</button>
+      <div class="flex gap-2">
+        <button id="exportBtn" class="px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-sm">Export board</button>
+        <button id="shareBtn" class="px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-sm">Share</button>
       </div>
-    </section>
+    </div>
 
-    <section id="boardWrap" class="mt-4">
-      <div id="grid" class="bg-white rounded-2xl shadow-sm ring-1 ring-black/5 p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3"></div>
-      <p id="note" class="text-xs text-gray-500 mt-2">Tip: Photos up to 2 MB, videos up to 10 MB. A coordinator will mark items as Verified ✓.</p>
-    </section>
+    <p class="text-xs text-gray-500 dark:text-gray-400">
+      Upload photos (max 2 MB) or videos (max 10 MB). A coordinator will mark items as verified.
+    </p>
 
-    <section id="gate" class="mt-6 hidden">
-      <div class="bg-amber-50 text-amber-900 ring-1 ring-amber-200 rounded-2xl p-4">
-        <p id="gateMsg" class="text-sm"></p>
-        <div id="consentBtns" class="mt-3 hidden">
-          <button id="agreeBtn" class="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">I Agree</button>
-          <a href="./TERMS.html" class="px-3 py-2 rounded-lg bg-gray-100 text-sm">Read Terms</a>
-        </div>
+    <!-- Consent gate (unchanged) -->
+    <div id="gate" class="hidden max-w-md mx-auto p-5 rounded-xl ring-1 ring-black/5 dark:ring-gray-700 bg-white dark:bg-gray-800 space-y-4">
+      <p id="gateMsg" class="text-sm"></p>
+      <div id="consentBtns" class="hidden flex gap-3">
+        <button id="agreeBtn" class="flex-1 px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-700 text-white">I Agree</button>
+        <a href="./TERMS.html" class="flex-1 px-3 py-2 rounded-lg text-center bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">Read Terms</a>
       </div>
-    </section>
+    </div>
+
+    <!-- Mission grid -->
+    <div id="grid" class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
   </main>
+  <footer class="py-4 text-center text-xs text-gray-500 dark:text-gray-400">
+    © <span id="y"></span> Taiko Community Alliance
+  </footer>
 
   <script type="module">
-    import { renderHeader, initHeader } from './js/header.js'
+    import { renderHeader, initHeader, bindAuthHeader } from './js/header.js';
     import {
       supaFromConfig, requireApprovedOrRedirect, ensureProfile,
-      ensureBoard, getBoardItems, uploadProof, agreeConsent, signOut
-    } from './js/user-common.js'
+      getBoardItems, uploadProof, agreeConsent
+    } from './js/user-common.js';
 
-    // Inject header (with auth controls)
+    // Inject header with auth buttons
     document.getElementById('siteHeader').outerHTML = renderHeader({
       admin: false,
-      nav: [['Home','./index.html']],
+      nav: [['Home', './index.html']],
       withAuth: true
-    })
-    initHeader()
+    });
+    initHeader();
 
-    const supabase = supaFromConfig()
-    document.getElementById('signout')?.addEventListener('click', async () => {
-      await signOut(supabase); location.href = './access.html'
-    })
+    const supabase = supaFromConfig();
+    bindAuthHeader(supabase, { signInHref: './access.html' })
 
-    ;(async () => {
-      const grid = document.getElementById('grid')
-      const progressEl = document.getElementById('progress')
-      const verifiedEl = document.getElementById('verified')
-      const exportBtn = document.getElementById('exportBtn')
-      const shareBtn = document.getElementById('shareBtn')
-      const gate = document.getElementById('gate')
-      const gateMsg = document.getElementById('gateMsg')
-      const consentBtns = document.getElementById('consentBtns')
-      const agreeBtn = document.getElementById('agreeBtn')
-      const subtitle = document.getElementById('subtitle')
+    (async () => {
+      const grid        = document.getElementById('grid');
+      const progressEl  = document.getElementById('progress');
+      const exportBtn   = document.getElementById('exportBtn');
+      const shareBtn    = document.getElementById('shareBtn');
+      const gate        = document.getElementById('gate');
+      const gateMsg     = document.getElementById('gateMsg');
+      const consentBtns = document.getElementById('consentBtns');
+      const agreeBtn    = document.getElementById('agreeBtn');
+      const subtitle    = document.getElementById('subtitle');
 
-      const guard = await requireApprovedOrRedirect(supabase, { redirectTo: './access.html' })
-      if (guard.redirected) return
-
-      const { user, profile } = await ensureProfile(supabase)
-
+      // Require approved profile
+      const guard = await requireApprovedOrRedirect(supabase, { redirectTo: './access.html' });
+      if (guard.redirected) return;
+      const { user, profile } = await ensureProfile(supabase);
+      // Consent check
       if (!profile?.consent) {
-        gate.classList.remove('hidden'); gateMsg.textContent = 'Please agree to media usage to continue.'
-        consentBtns.classList.remove('hidden')
-        agreeBtn.onclick = async () => { await agreeConsent(supabase); window.location.reload() }
-        return
+        gate.classList.remove('hidden');
+        gateMsg.textContent = 'Please agree to media usage to continue.';
+        consentBtns.classList.remove('hidden');
+        agreeBtn.onclick = async () => {
+          await agreeConsent(supabase);
+          window.location.reload();
+        };
+        return;
       }
 
-      // Choose board: ?board=<id> or most recent; else send to tracks
-      const params = new URLSearchParams(location.search)
-      let boardId = params.get('board')
-
+      // Determine board ID
+      const params = new URLSearchParams(location.search);
+      let boardId = params.get('board');
       if (!boardId) {
         const { data } = await supabase
           .from('quest_boards')
           .select('id')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
-          .limit(1)
-        boardId = data?.[0]?.id || null
+          .limit(1);
+        boardId = data?.[0]?.id || null;
       }
-      if (!boardId) { location.replace('./tracks.html'); return }
+      if (!boardId) { location.replace('./tracks.html'); return; }
 
-      // Load board meta (track + day if present)
-      const { data: meta } = await supabase
-        .from('quest_boards')
+      // Optional: set subtitle with track/day info
+      const { data: meta } = await supabase.from('quest_boards')
         .select('track, day_date')
         .eq('id', boardId)
-        .maybeSingle()
+        .maybeSingle();
       if (meta?.track || meta?.day_date) {
-        const label = trackLabel(meta?.track)
-        const when  = meta?.day_date || ''
-        subtitle.textContent = [label, when].filter(Boolean).join(' • ')
+        const trackNames = { shimedaiko:'Shimedaiko', odaiko:'Odaiko', chudaiko:'Chūdaiko', okedo:'Okedō' };
+        const label      = trackNames[meta.track] || meta.track || '';
+        const when       = meta.day_date || '';
+        subtitle.textContent = [label, when].filter(Boolean).join(' • ');
       }
 
-      await renderBoard(boardId)
+      await renderBoard(boardId);
 
       async function renderBoard(id) {
-        const items = await getBoardItems(supabase, id)
-        const submitted = items.filter(it => !!it.proof_url).length
-        const verified = items.filter(it => !!it.verified).length
-        progressEl.textContent = `${submitted}/${items.length} submitted`
-        verifiedEl.textContent = `${verified} verified`
+        const items = await getBoardItems(supabase, id);
 
-        grid.innerHTML = ''
-        items.forEach((it, idx) => {
-          const cell = document.createElement('div')
-          cell.className = 'rounded-xl ring-1 ring-black/5 bg-white p-3 flex flex-col gap-2'
-          cell.innerHTML = `
-            <div class="text-xs text-gray-500">#${idx+1}</div>
-            <div class="text-sm text-gray-900">${escapeHtml(it.questions?.text || '')}</div>
-            <div class="flex items-center gap-2 mt-1">
-              ${it.proof_url
-                ? `<a href="${it.proof_url}" target="_blank" class="text-xs underline break-all">View proof</a>`
-                : `<span class="text-xs text-gray-500">No proof yet</span>`
+        // Filter and sort by question level (level 1–4 plus secret mission level 5)
+        const tasks      = items.filter(it => it.questions && it.questions.active).sort((a,b) => (a.questions.level ?? 1) - (b.questions.level ?? 1));
+        const completed  = tasks.filter(t => !!t.proof_url).length;
+
+        // Show secret mission if 4 tasks have submissions
+        const showSecret = (completed >= 4);
+        const display    = tasks.filter(t => (t.questions.level <= 4) || (showSecret && t.questions.level == 5)).slice(0, showSecret ? 5 : 4);
+
+        // Score styling (3 -> green, 4 -> gold, 5 -> teal)
+        let scoreColor = 'text-gray-900 dark:text-gray-100';
+        if (completed >= 3 && completed < 4) scoreColor = 'text-emerald-600';
+        if (completed >= 4 && completed < 5) scoreColor = 'text-yellow-600';
+        if (completed >= 5) scoreColor = 'text-teal-600';
+        const total = showSecret ? 5 : 4;
+        progressEl.textContent = `${completed}/${total}`;
+        progressEl.className   = `text-xl font-bold ${scoreColor}`;
+
+        // Render each mission cell
+        grid.innerHTML = '';
+        display.forEach((it, idx) => {
+          const cell = document.createElement('div');
+          cell.className = 'relative aspect-square rounded-xl ring-1 ring-black/5 dark:ring-gray-700 overflow-hidden bg-white dark:bg-gray-800 flex flex-col justify-between';
+          if (it.proof_url) {
+            // Show photo/video thumbnail
+            const ext = it.proof_url.split('.').pop().toLowerCase();
+            const isVideo = ['mp4','mov','webm','ogg'].includes(ext);
+            cell.innerHTML = `
+              ${isVideo
+                ? `<video src="${it.proof_url}" class="object-cover w-full h-full" preload="metadata" controls muted></video>`
+                : `<img src="${it.proof_url}" class="object-cover w-full h-full" alt="submission">`
               }
-              ${it.verified ? `<span class="ml-auto text-xs text-emerald-700">Verified ✓</span>` : ''}
-            </div>
-            <div class="flex items-center justify-between gap-2">
-              <input type="file" accept="image/*,video/*" data-id="${it.id}" class="text-xs">
-              <button class="btn-upload px-2.5 py-1.5 rounded-lg bg-gray-900 text-white text-xs" data-id="${it.id}">Upload</button>
-            </div>
-          `
-          grid.appendChild(cell)
-        })
+              <div class="absolute top-1 right-1 px-2 py-0.5 rounded-full text-xs font-semibold ${it.verified ? 'bg-emerald-100 text-emerald-700' : 'bg-yellow-100 text-yellow-700'}">
+                ${it.verified ? 'Verified ✓' : 'Pending'}
+              </div>
+            `;
+          } else {
+            // Show mission text and upload control
+            cell.innerHTML = `
+              <div class="p-3 flex-1 flex flex-col justify-center text-center">
+                <div class="text-xs text-gray-500 dark:text-gray-400 mb-1">Mission ${idx+1}</div>
+                <div class="text-sm text-gray-900 dark:text-gray-100 break-words">${escapeHtml(it.questions.text)}</div>
+              </div>
+              <div class="p-3 flex items-center gap-2">
+                <input type="file" accept="image/*,video/*" data-id="${it.id}" class="text-xs flex-1">
+                <button class="btn-upload px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-xs font-medium" data-id="${it.id}">Upload</button>
+              </div>
+            `;
+          }
+          grid.appendChild(cell);
+        });
+
+        // Attach upload handlers
         grid.querySelectorAll('.btn-upload').forEach(btn => {
           btn.addEventListener('click', async (e) => {
-            const id = e.currentTarget.dataset.id
-            const inp = grid.querySelector(`input[type=file][data-id="${id}"]`)
-            const file = inp?.files?.[0]
-            if (!file) { alert('Choose a file first.'); return }
-            try { await uploadProof(supabase, id, file); await renderBoard(boardId) }
-            catch (err) { alert(err.message || 'Upload failed') }
-          })
-        })
+            const id  = e.currentTarget.dataset.id;
+            const inp = grid.querySelector(`input[type=file][data-id="${id}"]`);
+            const file = inp?.files?.[0];
+            if (!file) {
+              alert('Choose a file first.');
+              return;
+            }
+            try {
+              await uploadProof(supabase, id, file);
+              await renderBoard(boardId);
+            } catch (err) {
+              alert(err.message || 'Upload failed');
+            }
+          });
+        });
       }
 
-      // Export / Share
+      // Export/Share (unchanged)
       exportBtn.onclick = async () => {
-        exportBtn.disabled = true
+        exportBtn.disabled = true;
         try {
-          const canvas = await html2canvas(document.getElementById('grid'), { backgroundColor: '#ffffff', scale: 2 })
-          const url = canvas.toDataURL('image/png')
-          const a = document.createElement('a'); a.href = url; a.download = 'taiko-quest-board.png'; a.click()
-        } finally { exportBtn.disabled = false }
-      }
+          const canvas = await html2canvas(document.getElementById('grid'), { backgroundColor: '#ffffff', scale: 2 });
+          const url    = canvas.toDataURL('image/png');
+          const a      = document.createElement('a');
+          a.href       = url;
+          a.download   = 'taiko-quest-board.png';
+          a.click();
+        } finally {
+          exportBtn.disabled = false;
+        }
+      };
       shareBtn.onclick = async () => {
         try {
-          const canvas = await html2canvas(document.getElementById('grid'), { backgroundColor: '#ffffff', scale: 2 })
-          const blob = await new Promise(res => canvas.toBlob(res, 'image/png'))
+          const canvas = await html2canvas(document.getElementById('grid'), { backgroundColor: '#ffffff', scale: 2 });
+          const blob   = await new Promise(res => canvas.toBlob(res, 'image/png'));
           if (navigator.canShare && navigator.canShare({ files: [new File([blob], 'taiko-quest-board.png', { type: 'image/png' })] })) {
-            const file = new File([blob], 'taiko-quest-board.png', { type: 'image/png' })
-            await navigator.share({ files: [file], title: 'My Taiko Quest Board' })
+            const file = new File([blob], 'taiko-quest-board.png', { type: 'image/png' });
+            await navigator.share({ files: [file], title: 'Taiko Quest Board', text: 'Check out my Taiko Quest board!' });
           } else {
-            const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'taiko-quest-board.png'; a.click(); URL.revokeObjectURL(url)
+            alert('Sharing is not supported in this browser.');
           }
-        } catch { alert('Share failed.') }
-      }
+        } catch (err) {
+          alert(err.message || 'Share failed');
+        }
+      };
 
-      function trackLabel(k){
-        const map = { shimedaiko:'Shimedaiko', odaiko:'Odaiko', chudaiko:'Chūdaiko', okedo:'Okedō' }
-        return map[k] || 'Taiko Quest'
-      }
-      function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) }
-    })()
+    })();
+    document.getElementById('y').textContent = new Date().getFullYear();
+
+    function escapeHtml(s='') {
+      return s.replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    }
   </script>
 </body>
 </html>
