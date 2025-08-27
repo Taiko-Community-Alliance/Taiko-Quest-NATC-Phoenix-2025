@@ -4,121 +4,60 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Admin · Taiko Quest NATC Phoenix 2025</title>
-  <meta name="color-scheme" content="light only">
   <link rel="stylesheet" href="../assets/tailwind.css">
   <script src="../config.js"></script>
 </head>
-<body class="min-h-screen bg-gray-50">
-  <!-- Header -->
-  <div id="siteHeader"></div>
+<body class="h-full">
+  <div class="max-w-7xl mx-auto p-4 sm:p-6">
+    <div id="siteHeader"></div>
 
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <!-- Signed-out state -->
-    <section id="signedOut" class="mt-10">
-      <div class="bg-white rounded-2xl ring-1 ring-black/5 p-6 sm:p-8">
-        <h1 class="text-2xl font-semibold">Welcome, coordinator 👋</h1>
-        <p class="text-sm text-gray-600 mt-2">Sign in with your TCA Google account to access the admin tools.</p>
-        <div class="mt-4">
-          <button id="signin2" class="px-4 py-2.5 rounded-xl bg-gray-900 text-white text-sm">Sign in</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- Not-admin notice -->
-    <section id="noAccess" class="mt-10 hidden">
-      <div class="bg-amber-50 text-amber-900 ring-1 ring-amber-200 rounded-2xl p-4">
-        <p class="text-sm">You’re signed in but don’t have admin access. Ask a coordinator to grant you admin.</p>
-      </div>
-    </section>
-
-    <!-- Admin dashboard -->
-    <section id="dash" class="mt-10 hidden">
-      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <a href="./people.html" class="block bg-white rounded-2xl ring-1 ring-black/5 p-5 hover:ring-gray-300 transition">
-          <div class="font-medium">People</div>
-          <p class="text-sm text-gray-600 mt-1">Approve accounts & manage admins.</p>
-        </a>
-        <a href="./questions.html" class="block bg-white rounded-2xl ring-1 ring-black/5 p-5 hover:ring-gray-300 transition">
-          <div class="font-medium">Questions</div>
-          <p class="text-sm text-gray-600 mt-1">Create & edit prompt pool.</p>
-        </a>
-        <a href="./verifications.html" class="block bg-white rounded-2xl ring-1 ring-black/5 p-5 hover:ring-gray-300 transition">
-          <div class="font-medium">Verifications</div>
-          <p class="text-sm text-gray-600 mt-1">Review attendee submissions.</p>
-        </a>
-        <!-- Optional: add reports when ready
-        <a href="./reports.html" class="block bg-white rounded-2xl ring-1 ring-black/5 p-5 hover:ring-gray-300 transition">
-          <div class="font-medium">Reports</div>
-          <p class="text-sm text-gray-600 mt-1">Stats & exports.</p>
-        </a> -->
-      </div>
-
-      <div class="mt-8 text-xs text-gray-500">
-        Need help? See project docs or contact the tech committee.
-      </div>
-    </section>
-  </main>
+    <main class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <a href="./people.html" class="block bg-white rounded-2xl ring-1 ring-black/5 p-5 hover:ring-gray-300">
+        <h2 class="text-lg font-semibold">People</h2>
+        <p class="text-sm text-gray-600 mt-1">Approve requests, promote/demote admins.</p>
+      </a>
+      <a href="./questions.html" class="block bg-white rounded-2xl ring-1 ring-black/5 p-5 hover:ring-gray-300">
+        <h2 class="text-lg font-semibold">Questions</h2>
+        <p class="text-sm text-gray-600 mt-1">Create, edit, activate/deactivate questions.</p>
+      </a>
+      <a href="./verifications.html" class="block bg-white rounded-2xl ring-1 ring-black/5 p-5 hover:ring-gray-300">
+        <h2 class="text-lg font-semibold">Verifications</h2>
+        <p class="text-sm text-gray-600 mt-1">Review and verify user submissions.</p>
+      </a>
+    </main>
+  </div>
 
   <script type="module">
-    import { renderHeader, initHeader } from '../js/header.js'
-    import { supaFromConfig, requireAdmin, signInGoogle, signOut } from '../js/admin-common.js'
+    import { renderHeader, initHeader, bindAuthButtons } from '../js/header.js'
 
+    // 1) Header first (always visible)
     document.getElementById('siteHeader').outerHTML = renderHeader({
-        admin: true,
-        nav: [
-            ['Main', './index.html'],
-            ['People', './people.html'],
-            ['Questions', './questions.html'],
-            ['Verifications', './verifications.html'],
-            // ['Reports', './reports.html'], --- IGNORE ---
-        ],
-        withAuth: true,
+      admin: true,
+      nav: [
+        ['Admin','./index.html'],
+        ['People','./people.html'],
+        ['Questions','./questions.html'],
+        ['Verifications','./verifications.html'],
+      ],
+      withAuth: true
     })
     initHeader()
 
+    // 2) Admin code after header
+    const { supaFromConfig, requireAdmin, signInGoogle, signOut } =
+      await import('../js/admin-common.js')
+
     const supabase = supaFromConfig()
-    const ADMIN_DOMAIN = '@taikocommunityalliance.org'
+    bindAuthButtons({
+      onSignIn: () => signInGoogle(supabase),
+      onSignOut: () => signOut(supabase)
+    })
 
-    const whoami   = document.getElementById('whoami')
-    const signin   = document.getElementById('signin')
-    const signin2   = document.getElementById('signin2')
+    // Optional: first-paint label swap via desktop ids
+    const whoami  = document.getElementById('whoami')
+    const signin  = document.getElementById('signin')
     const signout = document.getElementById('signout')
-    const signedOut= document.getElementById('signedOut')
-    const noAccess = document.getElementById('noAccess')
-    const dash     = document.getElementById('dash')
-
-    const doSignIn = () => signInGoogle(supabase)
-    if (signin) signin.onclick = () => signInGoogle(supabase)
-    if (signin2) signin2.onclick = () => signInGoogle(supabase)
-    if (signout) signout.onclick = () => signOut(supabase)
-
-    async function boot(){
-      const guard = await requireAdmin(supabase, ADMIN_DOMAIN, { signinBtn: signin, signoutBtn: signout, whoami })
-
-      const { data:{ user } } = await supabase.auth.getUser()
-      const loggedIn = !!user
-      whoami.classList.toggle('hidden', !loggedIn)
-
-      if (!loggedIn) {
-        signedOut.classList.remove('hidden')
-        noAccess.classList.add('hidden')
-        dash.classList.add('hidden')
-        return
-      }
-
-      if (!guard.admin) {
-        signedOut.classList.add('hidden')
-        noAccess.classList.remove('hidden')
-        dash.classList.add('hidden')
-        return
-      }
-
-      signedOut.classList.add('hidden')
-      noAccess.classList.add('hidden')
-      dash.classList.remove('hidden')
-    }
-
-    boot()
+    await requireAdmin(supabase, null, { signinBtn: signin, signoutBtn: signout, whoami })
   </script>
 </body>
 </html>

@@ -19,36 +19,34 @@ export function renderHeader({ admin = false, nav = [], withAuth = false } = {})
   ` : ''
 
   return `
-<header class="bg-white/90 backdrop-blur shadow-sm">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-    <a href="${home}" class="group flex items-center gap-3">
-      <img src="${base}/assets/brand/TCA-Logo.png" alt="TCA Logo" class="h-8 w-auto" onerror="this.style.display='none'">
-      <div>
-        <div class="font-semibold text-lg group-hover:underline">Taiko Quest · NATC Phoenix 2025</div>
-        <div class="text-xs text-gray-600">Taiko Community Alliance</div>
+<header class="bg-white shadow-sm">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <!-- Title row -->
+    <div class="flex items-center justify-between">
+      <a href="${homeHref}" class="flex items-center gap-2 group">
+        <img src="${logoSrc}" alt="TCA" class="h-8 sm:h-10 w-auto">
+        <span class="text-lg sm:text-xl md:text-2xl font-semibold text-gray-900 group-hover:underline">${title}</span>
+      </a>
+
+      <button id="menuBtn" class="sm:hidden inline-flex items-center justify-center p-2 rounded-md ring-1 ring-gray-300" aria-label="Open menu">☰</button>
+
+      <div class="hidden sm:flex items-center gap-2">
+        ${links}
+        ${withAuth ? `
+          <span id="whoami" class="js-whoami text-sm text-gray-600">Checking session…</span>
+          <button id="signin" class="js-signin hidden px-3 py-2 rounded-lg bg-gray-900 text-white text-sm">Sign in</button>
+          <button id="signout" class="js-signout hidden px-3 py-2 rounded-lg bg-gray-200 text-gray-900 text-sm">Sign out</button>
+        ` : ''}
       </div>
-    </a>
-
-    <!-- Desktop nav -->
-    <nav class="hidden sm:flex items-center gap-2">
-      ${navLinks}
-      ${authHTML}
-    </nav>
-
-    <!-- Mobile controls -->
-    <button id="menuBtn" class="sm:hidden p-2 rounded-lg border border-gray-200" aria-label="Open menu" aria-controls="mobileNav" aria-expanded="false">
-      <svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-      </svg>
-    </button>
+    </div>
+    <!-- Subheader -->
+    <div class="mt-1 text-xs text-gray-500">Taiko Community Alliance</div>
   </div>
 
-  <!-- Mobile nav -->
-  <div id="mobileNav" class="sm:hidden hidden border-t border-gray-100">
-    <div class="px-4 py-3 flex flex-col gap-2">
-      ${nav.map(([label, href]) =>
-        `<a href="${href}" class="px-3 py-2 rounded-lg hover:bg-gray-100 text-sm">${escapeHtml(label)}</a>`
-      ).join('')}
+  <!-- Mobile menu -->
+  <div id="mobileMenu" class="sm:hidden hidden border-t border-gray-200">
+    <div class="px-4 py-3 space-y-2">
+      ${links ? `<nav class="flex flex-col gap-1">${links}</nav>` : ''}
       ${withAuth ? `
         <div class="flex items-center gap-2 pt-2">
           <!-- Use a UNIQUE id here to avoid duplicate IDs -->
