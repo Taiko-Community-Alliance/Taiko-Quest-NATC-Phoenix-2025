@@ -10,6 +10,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 export const EVENT_TZ = 'America/Phoenix' // conference local time
 
+export const CONF_START = new Date('2025-08-29T00:00:00-07:00');
+export const MAX_DAYS   = 4;
+
 export function supaFromConfig() {
   const { SUPABASE_URL, SUPABASE_KEY } = window.__ENV || {}
   if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Missing Supabase config')
@@ -126,65 +129,32 @@ export async function agreeConsent(supabase) {
  * ----------------------------------------------------- */
 
 const LEVEL_TARGETS_25 = { 1: 13, 2: 9, 3: 3, 4: 0 }
-function shufflePick(arr, n) { const a=arr.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]} return a.slice(0,n) }
-
-export async function ensureBoard(supabase, userId) {
-  const { data: existing } = await supabase.from('quest_boards').select('id').eq('user_id', userId).maybeSingle()
-  if (existing) return existing
-
-  const { data: qs, error: qErr } = await supabase.from('questions').select('id, level, text').eq('active', true)
-  if (qErr) throw qErr
-  if (!qs?.length) throw new Error('No active questions available.')
-
-  const byLevel = { 1: [], 2: [], 3: [], 4: [] }
-  qs.forEach(q => (byLevel[q.level] || (byLevel[q.level] = [])).push(q))
-
-  let selected = []
-  for (const lvl of [1,2,3,4]) {
-    const want = LEVEL_TARGETS_25[lvl] || 0
-    selected = selected.concat(shufflePick(byLevel[lvl] || [], Math.min(want, byLevel[lvl]?.length || 0)))
-  }
-  if (selected.length < 25) {
-    const remaining = qs.filter(q => !selected.some(s => s.id === q.id))
-    selected = selected.concat(shufflePick(remaining, 25 - selected.length))
-  }
-  selected = selected.slice(0, 25)
-
-  const { data: insBoards, error: bErr } = await supabase.from('quest_boards').insert({ user_id: userId }).select()
-  if (bErr) throw bErr
-  const board = insBoards[0]
-
-  const items = selected.map(q => ({ board_id: board.id, question_id: q.id }))
-  const { error: biErr } = await supabase.from('board_items').insert(items)
-  if (biErr) throw biErr
-
-  return board
-}
 
 /* -------------------------------------------------------
  * Track-per-day boards (4 + 1 bonus)
  * ----------------------------------------------------- */
 
-/** Boards for this user on a specific YYYY-MM-DD (Phoenix day) */
-export async function listBoardsForDay(supabase, userId, dayDate) {
+/** Get all boards for the user */
+export async function getUserBoards(supabase, userId, dayDate) {
   const { data, error } = await supabase
     .from('quest_boards')
-    .select('id, track, day_date, created_at')
+    .select('id, track, day_no, created_at')
     .eq('user_id', userId)
-    .eq('day_date', dayDate)
-    .order('created_at', { ascending: true })
   if (error) throw error
+
+  if (!data) {
+
+  }
   return data || []
 }
 
 /** Recent boards for history */
-export async function listRecentBoards(supabase, userId, limit = 10) {
+export async function listRecentBoards(supabase, userId) {
   const { data, error } = await supabase
     .from('quest_boards')
-    .select('id, track, day_date, created_at')
+    .select('id, track, day_no, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
-    .limit(limit)
   if (error) throw error
   return data || []
 }
@@ -207,25 +177,32 @@ export async function trackStatsForUser(supabase, userId) {
 /**
  * Ensure a board for today & a specific track, with 4 main + 1 bonus question.
  * Enforces 1 board per day (any track) by checking any existing board today.
- * Assumes quest_boards has (user_id, track text, day_date date).
+ * Assumes quest_boards has (user_id, track text, day_no date).
  * Optionally, board_items has is_bonus boolean (remove if your schema lacks it).
  */
 export async function ensureTrackBoardForToday(supabase, userId, track) {
-  const day = todayStrAZ()
+  const nowPhoenix = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Phoenix' }));
+  const midnight   = new Date(nowPhoenix.getFullYear(), nowPhoenix.getMonth(), nowPhoenix.getDate());
+  const dayOffset  = Math.floor((midnight - CONF_START) / (24 * 60 * 60 * 1000)) + 1;
 
-  // If already exists for this track today, reuse
   const { data: existing } = await supabase
     .from('quest_boards')
     .select('id')
     .eq('user_id', userId)
     .eq('track', track)
-    .eq('day_date', day)
     .maybeSingle()
   if (existing) return existing
 
-  // Enforce 1 per day across tracks
-  const todays = await listBoardsForDay(supabase, userId, day)
-  if (todays.length >= 1) throw new Error('Daily limit reached')
+  // Create the quest board
+  const { data: board, error: bErr } = await supabase
+    .from('quest_boards')
+    .insert([
+      { user_id: userId, track: track, day_no: dayOffset, status: 'open' }
+    ])
+    .select('id')
+    .maybeSingle()
+  
+  if (bErr) throw bErr
 
   // Pull 5 questions from this track/category
   const { data: pool, error: qErr } = await supabase
@@ -236,17 +213,11 @@ export async function ensureTrackBoardForToday(supabase, userId, track) {
   if (qErr) throw qErr
   if (!pool?.length || pool.length < 5) throw new Error('Not enough active questions in this track')
 
-  const main = shuffleAndTake(pool, 4)
+  const main = shuffleAndTake(pool, 4) // add level filter
   const remaining = pool.filter(q => !main.some(m => m.id === q.id))
-  const bonus = shuffleAndTake(remaining, 1)
+  const bonus = shuffleAndTake(remaining, 1) // special level
 
-  // Create board for today/track
-  const { data: boards, error: bErr } = await supabase
-    .from('quest_boards')
-    .insert({ user_id: userId, track, day_date: day })
-    .select()
-  if (bErr) throw bErr
-  const board = boards[0]
+  console.log('Selected questions:', main, bonus)
 
   // Insert items (set is_bonus if your schema has it)
   const items = [
@@ -257,6 +228,7 @@ export async function ensureTrackBoardForToday(supabase, userId, track) {
   const hasIsBonus = true // flip to false if you removed the column
   const payload = hasIsBonus ? items : items.map(({ is_bonus, ...rest }) => rest)
 
+  console.log('Inserting items:', payload)
   const { error: iErr } = await supabase.from('board_items').insert(payload)
   if (iErr) throw iErr
 
@@ -279,7 +251,7 @@ function shuffleAndTake(arr, n) {
 export async function getBoardItems(supabase, boardId) {
   const { data, error } = await supabase
     .from('board_items')
-    .select('id, proof_url, verified, questions(text)')
+    .select('id, proof_url, verified, is_bonus, questions(text, level, category, active)')
     .eq('board_id', boardId)
   if (error) throw error
   return data || []

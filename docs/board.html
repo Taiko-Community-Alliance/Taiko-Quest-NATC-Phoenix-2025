@@ -26,7 +26,7 @@
         <span id="progress" class="text-xl font-bold"></span>
         <!-- verified count still available, but we focus on score -->
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 hidden md:block">
         <button id="exportBtn" class="px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-sm">Export board</button>
         <button id="shareBtn" class="px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-sm">Share</button>
       </div>
@@ -69,6 +69,7 @@
 
     const supabase = supaFromConfig();
     bindAuthHeader(supabase, { signInHref: './access.html' })
+    console.log('Supabase initialized', supabase);
 
     (async () => {
       const grid        = document.getElementById('grid');
@@ -113,13 +114,13 @@
 
       // Optional: set subtitle with track/day info
       const { data: meta } = await supabase.from('quest_boards')
-        .select('track, day_date')
+        .select('track, day_no')
         .eq('id', boardId)
         .maybeSingle();
-      if (meta?.track || meta?.day_date) {
+      if (meta?.track || meta?.day_no) {
         const trackNames = { shimedaiko:'Shimedaiko', odaiko:'Odaiko', chudaiko:'Chūdaiko', okedo:'Okedō' };
         const label      = trackNames[meta.track] || meta.track || '';
-        const when       = meta.day_date || '';
+        const when       = meta.day_no || '';
         subtitle.textContent = [label, when].filter(Boolean).join(' • ');
       }
 
@@ -129,12 +130,14 @@
         const items = await getBoardItems(supabase, id);
 
         // Filter and sort by question level (level 1–4 plus secret mission level 5)
-        const tasks      = items.filter(it => it.questions && it.questions.active).sort((a,b) => (a.questions.level ?? 1) - (b.questions.level ?? 1));
-        const completed  = tasks.filter(t => !!t.proof_url).length;
+        const questions  = items.filter(it => it.questions && it.questions.active && !it.questions.is_bonus).sort((a,b) => (a.questions.level ?? 1) - (b.questions.level ?? 1));
+        console.log('Board items', items, 'Filtered questions', questions);
+        const completed  = questions.filter(t => !!t.proof_url).length;
 
         // Show secret mission if 4 tasks have submissions
-        const showSecret = (completed >= 4);
-        const display    = tasks.filter(t => (t.questions.level <= 4) || (showSecret && t.questions.level == 5)).slice(0, showSecret ? 5 : 4);
+        const showSecret = (completed >= 4) && false;
+        console.log(questions)
+        const missions    = questions.filter(t => (t.questions.level <= 4) || (showSecret && t.questions.level == 5)).slice(0, showSecret ? 5 : 4);
 
         // Score styling (3 -> green, 4 -> gold, 5 -> teal)
         let scoreColor = 'text-gray-900 dark:text-gray-100';
@@ -144,10 +147,14 @@
         const total = showSecret ? 5 : 4;
         progressEl.textContent = `${completed}/${total}`;
         progressEl.className   = `text-xl font-bold ${scoreColor}`;
-
+        if (completed === total) {
+          progressEl.textContent += ' 🎉 All done!';
+        }
         // Render each mission cell
         grid.innerHTML = '';
-        display.forEach((it, idx) => {
+        console.log('Missions to render', missions);
+        missions.forEach((it, idx) => {
+          console.log('Rendering item', it);
           const cell = document.createElement('div');
           cell.className = 'relative aspect-square rounded-xl ring-1 ring-black/5 dark:ring-gray-700 overflow-hidden bg-white dark:bg-gray-800 flex flex-col justify-between';
           if (it.proof_url) {
@@ -160,7 +167,7 @@
                 : `<img src="${it.proof_url}" class="object-cover w-full h-full" alt="submission">`
               }
               <div class="absolute top-1 right-1 px-2 py-0.5 rounded-full text-xs font-semibold ${it.verified ? 'bg-emerald-100 text-emerald-700' : 'bg-yellow-100 text-yellow-700'}">
-                ${it.verified ? 'Verified ✓' : 'Pending'}
+                ${it.verified ? 'Verified ✓' : 'Pending Verification'}
               </div>
             `;
           } else {

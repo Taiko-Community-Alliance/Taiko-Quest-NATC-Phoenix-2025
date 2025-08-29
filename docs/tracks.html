@@ -26,7 +26,7 @@
     <!-- Tracks grid (responsive squares) -->
     <div id="tracksGrid" class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
 
-    <section class="space-y-6">
+    <section class="space-y-6 hidden md:block">
       <div>
         <h2 class="text-xl font-semibold">Your Track Progress</h2>
         <button id="refreshProgress" class="ml-2 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-200">Refresh</button>
@@ -47,24 +47,20 @@
     import { renderHeader, initHeader, bindAuthHeader } from './js/header.js';
     import {
       supaFromConfig, requireApprovedOrRedirect, ensureProfile,
-      todayStrAZ, listBoardsForDay, listRecentBoards,
-      ensureTrackBoardForToday, trackStatsForUser
+      todayStrAZ, getUserBoards, listRecentBoards,
+      ensureTrackBoardForToday, trackStatsForUser, CONF_START, MAX_DAYS
     } from './js/user-common.js';
 
     // Insert header
     document.getElementById('siteHeader').outerHTML = renderHeader({
       admin: false,
-      nav: [['Home', './index.html'], ['My Board', './board.html']],
+      nav: [['Home', './index.html']],
       withAuth: true
     });
     initHeader();
 
     const supabase = supaFromConfig();
     bindAuthHeader(supabase, { signInHref: './access.html' })
-
-    // Conference start (America/Phoenix)
-    const CONF_START = new Date('2025-08-29T00:00:00-07:00');
-    const MAX_DAYS   = 4;
 
     // Elements
     const dayLabel     = document.getElementById('dayLabel');
@@ -78,8 +74,8 @@
     const TRACKS = [
       { key: 'shimedaiko', label: 'Shimedaiko' },
       { key: 'odaiko',     label: 'Odaiko' },
-      { key: 'chudaiko',   label: 'Chūdaiko' },
-      { key: 'okedo',      label: 'Okedō' },
+      { key: 'chudaiko',   label: 'Chudaiko' },
+      { key: 'okedo',      label: 'Okedo' },
     ];
     const DAILY_LIMIT = 1;
 
@@ -93,8 +89,8 @@
       const midnight   = new Date(nowPhoenix.getFullYear(), nowPhoenix.getMonth(), nowPhoenix.getDate());
       const dayOffset  = Math.floor((midnight - CONF_START) / (24 * 60 * 60 * 1000)) + 1;
       // Set day label
-      if (dayOffset >= 1) {
-        dayLabel.textContent = `Day ${dayOffset}`;
+      if (dayOffset >= 0) {
+        dayLabel.textContent = `Day ${dayOffset+1}`;
       } else {
         dayLabel.textContent = `D-${Math.abs(dayOffset)}`;
       }
@@ -105,11 +101,11 @@
 
       // Boards opened today
       const todayStr = todayStrAZ();
-      const todayBoards = await listBoardsForDay(supabase, user.id, todayStr);
-      const canOpenMoreToday = (todayBoards.length < DAILY_LIMIT);
+      const userBoards = await getUserBoards(supabase, user.id)
+      const canOpenMore = userBoards.filter(b => b.status === 'open').length == 0;
 
       // Map by track
-      const mapToday = Object.fromEntries((todayBoards || []).map(b => [b.track, b]));
+      const mapToday = Object.fromEntries((userBoards || []).map(b => [b.track, b]));
 
       // Render track cards (square)
       tracksGrid.innerHTML = '';
@@ -119,13 +115,13 @@
         card.className = 'flex flex-col items-center justify-between aspect-square rounded-xl ring-1 ring-black/5 dark:ring-gray-700 p-4 bg-white dark:bg-gray-800';
         card.innerHTML = `
           <div class="text-lg font-semibold">${tr.label}</div>
-          <div class="text-xs text-gray-500 dark:text-gray-400">${existing ? 'Unlocked for today' : (conferenceEnded ? 'Conference ended' : 'Locked for today')}</div>
+          <div class="text-xs text-gray-500 dark:text-gray-400">${existing ? `Check Later for Score` : (conferenceEnded ? 'Conference ended' : canOpenMore? 'Unlock New Track': 'Finish Open Board First')}</div>
           <div class="w-full mt-auto">
             ${
               existing
                 ? `<a href="./board.html?board=${existing.id}" class="block w-full px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-center text-sm">Continue</a>`
                 : (
-                    (!conferenceEnded && canOpenMoreToday)
+                    (!conferenceEnded && canOpenMore)
                       ? `<button class="btn-start block w-full px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-sm" data-track="${tr.key}">Start</button>`
                       : `<span class="block w-full text-sm text-gray-500 dark:text-gray-400 text-center">${conferenceEnded ? 'Check back next year' : 'Check back tomorrow'}</span>`
                   )
@@ -139,7 +135,7 @@
       tracksGrid.querySelectorAll('.btn-start').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           // Pre-conference
-          if (dayOffset < 1) {
+          if (dayOffset < 0) {
             alert('The conference hasn’t started yet.');
             return;
           }
@@ -188,7 +184,6 @@
           row.innerHTML = `
             <div>
               <div class="font-medium">${TRACKS.find(t => t.key===b.track)?.label || b.track}</div>
-              <div class="text-xs text-gray-500 dark:text-gray-400">${b.day_date ?? new Date(b.created_at).toLocaleDateString()}</div>
             </div>
             <a href="./board.html?board=${b.id}" class="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100">View</a>
           `;
