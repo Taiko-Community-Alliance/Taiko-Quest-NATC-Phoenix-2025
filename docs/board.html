@@ -130,12 +130,12 @@
         const items = await getBoardItems(supabase, id);
 
         // Filter and sort by question level (level 1–4 plus secret mission level 5)
-        const questions      = items.filter(it => it.questions && it.questions.active).sort((a,b) => (a.questions.level ?? 1) - (b.questions.level ?? 1));
+        const questions  = items.filter(it => it.questions && it.questions.active && !it.questions.is_bonus).sort((a,b) => (a.questions.level ?? 1) - (b.questions.level ?? 1));
         console.log('Board items', items, 'Filtered questions', questions);
         const completed  = questions.filter(t => !!t.proof_url).length;
 
         // Show secret mission if 4 tasks have submissions
-        const showSecret = (completed >= 4);
+        const showSecret = (completed >= 4) && false;
         console.log(questions)
         const missions    = questions.filter(t => (t.questions.level <= 4) || (showSecret && t.questions.level == 5)).slice(0, showSecret ? 5 : 4);
 
