@@ -251,7 +251,7 @@ function shuffleAndTake(arr, n) {
 export async function getBoardItems(supabase, boardId) {
   const { data, error } = await supabase
     .from('board_items')
-    .select('id, proof_url, verified, is_bonus, question(text, level, category)')
+    .select('id, proof_url, verified, is_bonus, questions(text, level, category, active)')
     .eq('board_id', boardId)
   if (error) throw error
   return data || []
