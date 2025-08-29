@@ -169,7 +169,7 @@
         } else if (!needsConsent && !approved) {
           state.textContent = (regStatus === 'rejected')
             ? 'Your request was not approved.'
-            : 'Pending approval. Please check back later.';
+            : 'Please wait a moment while we process your registration.';
         }
       } catch (e) {
         alert(e?.message || 'Could not save consent. Please try again.');
