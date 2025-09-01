@@ -78,7 +78,7 @@
     supaFromConfig,
     requireSignedInOrRedirect,
     ensureProfile, gateCheck, agreeConsent,
-    todayStrAZ, getUserBoards, listRecentBoards,
+    todayStrAZ, getUserBoardsWithComputedStatus as getUserBoards, listRecentBoards,
     ensureTrackBoardForToday, trackStatsForUser, CONF_START, MAX_DAYS
   } from './js/user-common.js';
 
@@ -178,8 +178,9 @@
 
   async function hydrateBoardsState() {
     const boards = await getUserBoards(supabase, state.user.id);
+    console.log('Boards:', boards);
 
-    const hasOpen = (boards || []).some(b => b.status === 'open');
+    const hasOpen = (boards || []).some(b => b.computed_status === 'open');
     state.canOpenMoreToday = !hasOpen;
 
     state.boardsByTrack = Object.fromEntries((boards || []).map(b => [b.track, b]));
@@ -198,26 +199,28 @@
     TRACKS.forEach(tr => {
       const existing = state.boardsByTrack[tr.key] || null;
 
-      const statusText =
-        existing
-          ? 'Check later for score'
-          : state.conferenceEnded
+      // Display status line (if board exists, show its real status)
+      const statusLine = existing
+        ? (existing.computed_status || 'open')
+        : (state.conferenceEnded
             ? 'Conference ended'
             : canOpenMore
               ? (canStart ? 'Unlock New Track' : (!state.approved ? 'Pending approval' : 'Please consent to continue'))
-              : 'Finish Open Board First';
+              : 'Finish Open Board First');
 
-      const ctaHTML = existing
+      // Decide the action slot
+      const actionHtml = existing
         ? `<a href="./board.html?board=${existing.id}" class="block w-full px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-center text-sm">Continue</a>`
         : (!state.conferenceEnded && canOpenMore && canStart
             ? `<button class="btn-start block w-full px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-sm" data-track="${tr.key}">Start</button>`
-            : `<span class="block w-full text-sm text-gray-500 dark:text-gray-400 text-center">${statusText}</span>`);
+            : `<span class="block w-full text-sm text-gray-500 dark:text-gray-400 text-center">${statusLine}</span>`);
 
       const card = document.createElement('div');
       card.className = 'flex flex-col items-center justify-between aspect-square rounded-xl ring-1 ring-black/5 dark:ring-gray-700 p-4 bg-white dark:bg-gray-800';
       card.innerHTML = `
         <div class="text-lg font-semibold">${tr.label}</div>
-        <div class="w-full mt-auto">${ctaHTML}</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400">${existing?.computed_status || 'Not Started'}</div>
+        <div class="w-full mt-auto">${actionHtml}</div>
       `;
       tracksGrid.appendChild(card);
     });

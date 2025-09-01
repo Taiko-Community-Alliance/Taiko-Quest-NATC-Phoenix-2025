@@ -130,34 +130,15 @@ export async function agreeConsent(supabase) {
 }
 
 /* -------------------------------------------------------
- * Classic “25 tile” fallback board (optional)
- * ----------------------------------------------------- */
-
-const LEVEL_TARGETS_25 = { 1: 13, 2: 9, 3: 3, 4: 0 }
-
-/* -------------------------------------------------------
  * Track-per-day boards (4 + 1 bonus)
  * ----------------------------------------------------- */
 
-/** Get all boards for the user */
-export async function getUserBoards(supabase, userId, dayDate) {
-  const { data, error } = await supabase
-    .from('quest_boards')
-    .select('id, track, day_no, status, created_at')
-    .eq('user_id', userId)
-  if (error) throw error
-
-  if (!data) {
-
-  }
-  return data || []
-}
 
 /** Recent boards for history */
 export async function listRecentBoards(supabase, userId) {
   const { data, error } = await supabase
     .from('quest_boards')
-    .select('id, track, day_no, created_at')
+    .select('id, track, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -258,6 +239,15 @@ export async function getBoardItems(supabase, boardId) {
     .from('board_items')
     .select('id, proof_url, verified, is_bonus, questions(text, level, category, active)')
     .eq('board_id', boardId)
+  if (error) throw error
+  return data || []
+}
+
+export async function getUserBoardsWithComputedStatus(supabase, userId) {
+  const { data, error } = await supabase
+    .from('v_board_status')
+    .select('id, track, created_at, computed_status')
+    .eq('user_id', userId)
   if (error) throw error
   return data || []
 }
