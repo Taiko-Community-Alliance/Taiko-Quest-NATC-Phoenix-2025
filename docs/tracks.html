@@ -10,9 +10,39 @@
 </head>
 <body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
   <div id="siteHeader"></div>
-  <main class="px-4 py-8 space-y-4">
+  <div id="consentModal" class="hidden fixed inset-0 z-50">
+    <!-- Backdrop -->
+    <div class="absolute inset-0 bg-black/40"></div>
 
-    <!-- Day header (shows Day 1, D-1, etc.) -->
+    <!-- Dialog -->
+    <div class="relative h-full w-full grid place-items-center p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="consentTitle"
+          class="w-full max-w-lg rounded-xl bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black/5 dark:ring-gray-700">
+        <div class="p-6">
+          <h2 id="consentTitle" class="text-xl font-bold mb-3">Media Consent</h2>
+          <p class="text-sm text-gray-700 dark:text-gray-300">
+            I agree that Taiko Community Alliance (TCA) may use photos/videos I submit
+            for media purposes as described in the Terms and Privacy Policy.
+          </p>
+          <div class="mt-6 flex flex-wrap gap-3">
+            <button id="consentAgreeBtn"
+                    class="px-5 py-2.5 rounded-lg bg-gray-900 dark:bg-gray-700 text-white font-bold">
+              I Agree
+            </button>
+            <a href="./TERMS.html"
+              class="px-5 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200">
+              Terms
+            </a>
+            <a href="./PRIVACY.html"
+              class="px-5 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200">
+              Privacy
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <main class="px-4 py-8 space-y-4">
     <div class="text-center mb-4">
       <div id="dayLabel" class="text-2xl font-bold"></div>
       <div id="dayDate" class="text-xs text-gray-500 dark:text-gray-400"></div>
@@ -23,7 +53,6 @@
       You can unlock one track at the time. Each board has 4 missions. Complete as many as you can!
     </p>
 
-    <!-- Tracks grid (responsive squares) -->
     <div id="tracksGrid" class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
 
     <section class="space-y-6 hidden md:block">
@@ -44,156 +73,253 @@
   </footer>
 
   <script type="module">
-    import { renderHeader, initHeader, bindAuthHeader } from './js/header.js';
-    import {
-      supaFromConfig, requireApprovedOrRedirect, ensureProfile,
-      todayStrAZ, getUserBoards, listRecentBoards,
-      ensureTrackBoardForToday, trackStatsForUser, CONF_START, MAX_DAYS
-    } from './js/user-common.js';
+  import { renderHeader, initHeader, bindAuthHeader } from './js/header.js';
+  import {
+    supaFromConfig,
+    requireSignedInOrRedirect,
+    ensureProfile, gateCheck, agreeConsent,
+    todayStrAZ, getUserBoardsWithComputedStatus as getUserBoards, listRecentBoards,
+    ensureTrackBoardForToday, trackStatsForUser, CONF_START, MAX_DAYS
+  } from './js/user-common.js';
 
-    // Insert header
+  /* -----------------------------
+   * Elements & constants
+   * --------------------------- */
+  const supabase = supaFromConfig();
+
+  const dayLabel         = document.getElementById('dayLabel');
+  const dayDate          = document.getElementById('dayDate');
+  const tracksGrid       = document.getElementById('tracksGrid');
+  const progressList     = document.getElementById('progressList');
+  const historyBox       = document.getElementById('history');
+  const refreshProgress  = document.getElementById('refreshProgress');
+  const refreshHistory   = document.getElementById('refreshHistory');
+
+  const consentModal     = document.getElementById('consentModal');
+  const consentAgreeBtn  = document.getElementById('consentAgreeBtn');
+
+  const TRACKS = [
+    { key: 'shimedaiko', label: 'Shimedaiko' },
+    { key: 'odaiko',     label: 'Odaiko' },
+    { key: 'chudaiko',   label: 'Chudaiko' },
+    // { key: 'okedo',   label: 'Okedo' },
+  ];
+
+  // Shared state (filled by boot)
+  const state = {
+    user: null,
+    needsConsent: false,
+    approved: false,
+    regStatus: null,
+    dayOffset: 0,
+    conferenceEnded: false,
+    canOpenMoreToday: true, // based on boards status
+    boardsByTrack: {},
+  };
+
+  /* -----------------------------
+   * Boot sequence
+   * --------------------------- */
+  async function boot() {
+    // Header
     document.getElementById('siteHeader').outerHTML = renderHeader({
       admin: false,
       nav: [['Home', './index.html']],
       withAuth: true
     });
     initHeader();
+    bindAuthHeader(supabase, { signInHref: './access.html' });
 
-    const supabase = supaFromConfig();
-    bindAuthHeader(supabase, { signInHref: './access.html' })
+    const guard = await requireSignedInOrRedirect(supabase, { redirectTo: './access.html' });
+    if (guard.redirected) return;
 
-    // Elements
-    const dayLabel     = document.getElementById('dayLabel');
-    const dayDate      = document.getElementById('dayDate');
-    const tracksGrid   = document.getElementById('tracksGrid');
-    const progressList = document.getElementById('progressList');
-    const historyBox   = document.getElementById('history');
-    const refreshProgress = document.getElementById('refreshProgress');
-    const refreshHistory  = document.getElementById('refreshHistory');
+    computeConferenceDay();
 
-    const TRACKS = [
-      { key: 'shimedaiko', label: 'Shimedaiko' },
-      { key: 'odaiko',     label: 'Odaiko' },
-      { key: 'chudaiko',   label: 'Chudaiko' },
-      // { key: 'okedo',      label: 'Okedo' },
-    ];
+    await loadUserState();
 
-    (async () => {
-      const guard = await requireApprovedOrRedirect(supabase, { redirectTo: './access.html' });
-      if (guard.redirected) return;
-      const { user } = await ensureProfile(supabase);
+    await hydrateBoardsState();
 
-      // Determine Phoenix date
-      const nowPhoenix = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Phoenix' }));
-      const midnight   = new Date(nowPhoenix.getFullYear(), nowPhoenix.getMonth(), nowPhoenix.getDate());
-      const dayOffset  = Math.floor((midnight - CONF_START) / (24 * 60 * 60 * 1000)) + 1;
-      // Set day label
-      if (dayOffset >= 0) {
-        dayLabel.textContent = `Day ${dayOffset}`;
-      } else {
-        dayLabel.textContent = `D-${Math.abs(dayOffset)}`;
-      }
-      dayDate.textContent = `${midnight.getMonth()+1}/${midnight.getDate()}`;
+    renderTracks();
+    bindStartHandlers();
 
-      // Check if conference over (after day 4)
-      const conferenceEnded = (dayOffset > MAX_DAYS);
+    refreshProgress.addEventListener('click', loadProgress);
+    refreshHistory.addEventListener('click', loadHistory);
+    await Promise.all([loadProgress(), loadHistory()]);
 
-      // Boards opened today
-      const todayStr = todayStrAZ();
-      const userBoards = await getUserBoards(supabase, user.id)
-      const canOpenMore = userBoards.filter(b => b.status === 'open').length == 0;
+    if (state.needsConsent) openConsent();
+  }
 
-      // Map by track
-      const mapToday = Object.fromEntries((userBoards || []).map(b => [b.track, b]));
+  /* -----------------------------
+   * Helpers
+   * --------------------------- */
+  function computeConferenceDay() {
+    const nowPhoenix = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Phoenix' }));
+    const midnight   = new Date(nowPhoenix.getFullYear(), nowPhoenix.getMonth(), nowPhoenix.getDate());
+    const dayOffset  = Math.floor((midnight - CONF_START) / (24 * 60 * 60 * 1000)) + 1;
 
-      // Render track cards (square)
-      tracksGrid.innerHTML = '';
-      TRACKS.forEach(tr => {
-        const existing = mapToday[tr.key] || null;
-        const card = document.createElement('div');
-        card.className = 'flex flex-col items-center justify-between aspect-square rounded-xl ring-1 ring-black/5 dark:ring-gray-700 p-4 bg-white dark:bg-gray-800';
-        card.innerHTML = `
-          <div class="text-lg font-semibold">${tr.label}</div>
-          <div class="text-xs text-gray-500 dark:text-gray-400">${existing ? `Check Later for Score` : (conferenceEnded ? 'Conference ended' : canOpenMore? 'Unlock New Track': 'Finish Open Board First')}</div>
-          <div class="w-full mt-auto">
-            ${
-              existing
-                ? `<a href="./board.html?board=${existing.id}" class="block w-full px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-center text-sm">Continue</a>`
-                : (
-                    (!conferenceEnded && canOpenMore)
-                      ? `<button class="btn-start block w-full px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-sm" data-track="${tr.key}">Start</button>`
-                      : `<span class="block w-full text-sm text-gray-500 dark:text-gray-400 text-center">${conferenceEnded ? 'Check back next year' : 'Check back tomorrow'}</span>`
-                  )
-            }
-          </div>
-        `;
-        tracksGrid.appendChild(card);
-      });
+    state.dayOffset = dayOffset;
+    state.conferenceEnded = (dayOffset > MAX_DAYS);
 
-      // Start track logic
-      tracksGrid.querySelectorAll('.btn-start').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-          // Pre-conference
-          if (dayOffset < 0) {
-            alert('The conference hasn’t started yet.');
-            return;
-          }
-          // Post-conference
-          if (dayOffset > MAX_DAYS) {
-            alert('The conference has ended.');
-            return;
-          }
-          const track = e.currentTarget.dataset.track;
-          try {
-            const board = await ensureTrackBoardForToday(supabase, user.id, track);
-            location.href = `./board.html?board=${board.id}`;
-          } catch (err) {
-            alert(err.message || 'Could not start track.');
-          }
-        });
-      });
+    if (dayOffset >= 0) dayLabel.textContent = `Day ${dayOffset}`;
+    else                dayLabel.textContent = `D-${Math.abs(dayOffset)}`;
+    dayDate.textContent = `${midnight.getMonth() + 1}/${midnight.getDate()}`;
+  }
 
-      // Progress and history
-      async function loadProgress() {
-        progressList.innerHTML = '';
-        const stats = await trackStatsForUser(supabase, user.id);
-        TRACKS.forEach(tr => {
-          const count = stats[tr.key] ?? 0;
-          const tile = document.createElement('div');
-          tile.className = 'rounded-xl ring-1 ring-black/5 dark:ring-gray-700 p-4 bg-white dark:bg-gray-800';
-          tile.innerHTML = `
-            <div class="text-sm text-gray-600 dark:text-gray-400">${tr.label}</div>
-            <div class="mt-1 text-2xl font-semibold">${count}</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">boards completed</div>
-          `;
-          progressList.appendChild(tile);
-        });
-      }
-      async function loadHistory() {
-        historyBox.innerHTML = '<div class="text-gray-500 dark:text-gray-400">Loading…</div>';
-        const boards = await listRecentBoards(supabase, user.id, 12);
-        if (!boards.length) {
-          historyBox.innerHTML = '<div class="text-gray-600 dark:text-gray-400">No past boards yet.</div>';
-          return;
+  async function loadUserState() {
+    const { user } = await ensureProfile(supabase);
+    state.user = user;
+
+    const { needsConsent, approved, regStatus } = await gateCheck(supabase);
+
+    state.needsConsent = needsConsent;
+    state.approved = approved;
+    state.regStatus = regStatus;
+  }
+
+  async function hydrateBoardsState() {
+    const boards = await getUserBoards(supabase, state.user.id);
+    console.log('Boards:', boards);
+
+    const hasOpen = (boards || []).some(b => b.computed_status === 'open');
+    state.canOpenMoreToday = !hasOpen;
+
+    state.boardsByTrack = Object.fromEntries((boards || []).map(b => [b.track, b]));
+  }
+
+  function canStartTracksNow() {
+    return state.approved && !state.needsConsent && !state.conferenceEnded;
+  }
+
+  function renderTracks() {
+    tracksGrid.innerHTML = '';
+
+    const canStart = canStartTracksNow();
+    const canOpenMore = state.canOpenMoreToday;
+
+    TRACKS.forEach(tr => {
+      const existing = state.boardsByTrack[tr.key] || null;
+
+      // Display status line (if board exists, show its real status)
+      const statusLine = existing
+        ? (existing.computed_status || 'open')
+        : (state.conferenceEnded
+            ? 'Conference ended'
+            : canOpenMore
+              ? (canStart ? 'Unlock New Track' : (!state.approved ? 'Pending approval' : 'Please consent to continue'))
+              : 'Finish Open Board First');
+
+      // Decide the action slot
+      const actionHtml = existing
+        ? `<a href="./board.html?board=${existing.id}" class="block w-full px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-center text-sm">Continue</a>`
+        : (!state.conferenceEnded && canOpenMore && canStart
+            ? `<button class="btn-start block w-full px-3 py-2 rounded-lg bg-gray-900 dark:bg-gray-700 text-white text-sm" data-track="${tr.key}">Start</button>`
+            : `<span class="block w-full text-sm text-gray-500 dark:text-gray-400 text-center">${statusLine}</span>`);
+
+      const card = document.createElement('div');
+      card.className = 'flex flex-col items-center justify-between aspect-square rounded-xl ring-1 ring-black/5 dark:ring-gray-700 p-4 bg-white dark:bg-gray-800';
+      card.innerHTML = `
+        <div class="text-lg font-semibold">${tr.label}</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400">${existing?.computed_status || 'Not Started'}</div>
+        <div class="w-full mt-auto">${actionHtml}</div>
+      `;
+      tracksGrid.appendChild(card);
+    });
+  }
+
+  function bindStartHandlers() {
+    if (!canStartTracksNow()) return;
+
+    tracksGrid.querySelectorAll('.btn-start').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        if (state.dayOffset < 0) { alert('The conference hasn’t started yet.'); return; }
+        if (state.dayOffset > MAX_DAYS) { alert('The conference has ended.'); return; }
+
+        if (!state.approved) { alert('Pending approval. Please check back later.'); return; }
+        if (state.needsConsent) { openConsent(); return; }
+
+        const track = e.currentTarget.dataset.track;
+        try {
+          const board = await ensureTrackBoardForToday(supabase, state.user.id, track);
+          location.href = `./board.html?board=${board.id}`;
+        } catch (err) {
+          alert(err.message || 'Could not start track.');
         }
-        historyBox.innerHTML = '';
-        boards.forEach(b => {
-          const row = document.createElement('div');
-          row.className = 'flex items-center justify-between p-2 rounded-lg ring-1 ring-gray-200 dark:ring-gray-700 bg-white dark:bg-gray-800';
-          row.innerHTML = `
-            <div>
-              <div class="font-medium">${TRACKS.find(t => t.key===b.track)?.label || b.track}</div>
-            </div>
-            <a href="./board.html?board=${b.id}" class="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100">View</a>
-          `;
-          historyBox.appendChild(row);
-        });
-      }
-      refreshProgress.addEventListener('click', loadProgress);
-      refreshHistory.addEventListener('click', loadHistory);
-      await Promise.all([loadProgress(), loadHistory()]);
-    })();
-    document.getElementById('y').textContent = new Date().getFullYear();
-  </script>
+      });
+    });
+  }
+
+  async function loadProgress() {
+    progressList.innerHTML = '';
+    const stats = await trackStatsForUser(supabase, state.user.id);
+    TRACKS.forEach(tr => {
+      const count = stats[tr.key] ?? 0;
+      const tile = document.createElement('div');
+      tile.className = 'rounded-xl ring-1 ring-black/5 dark:ring-gray-700 p-4 bg-white dark:bg-gray-800';
+      tile.innerHTML = `
+        <div class="text-sm text-gray-600 dark:text-gray-400">${tr.label}</div>
+        <div class="mt-1 text-2xl font-semibold">${count}</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400">boards completed</div>
+      `;
+      progressList.appendChild(tile);
+    });
+  }
+
+  async function loadHistory() {
+    historyBox.innerHTML = '<div class="text-gray-500 dark:text-gray-400">Loading…</div>';
+    const boards = await listRecentBoards(supabase, state.user.id, 12);
+    if (!boards.length) {
+      historyBox.innerHTML = '<div class="text-gray-600 dark:text-gray-400">No past boards yet.</div>';
+      return;
+    }
+    historyBox.innerHTML = '';
+    boards.forEach(b => {
+      const row = document.createElement('div');
+      row.className = 'flex items-center justify-between p-2 rounded-lg ring-1 ring-gray-200 dark:ring-gray-700 bg-white dark:bg-gray-800';
+      row.innerHTML = `
+        <div>
+          <div class="font-medium">${TRACKS.find(t => t.key === b.track)?.label || b.track}</div>
+        </div>
+        <a href="./board.html?board=${b.id}" class="px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100">View</a>
+      `;
+      historyBox.appendChild(row);
+    });
+  }
+
+  function openConsent() {
+    consentModal.classList.remove('hidden');
+    requestAnimationFrame(() => consentAgreeBtn?.focus());
+  }
+
+  function closeConsent() {
+    consentModal.classList.add('hidden');
+  }
+
+  async function refreshGate() {
+    const g = await gateCheck(supabase);
+    state.needsConsent = g.needsConsent;
+    state.approved     = g.approved;
+    state.regStatus    = g.regStatus;
+  }
+
+  consentAgreeBtn.addEventListener('click', async () => {
+    consentAgreeBtn.disabled = true;
+    try {
+      await agreeConsent(supabase);
+      closeConsent();
+      await refreshGate();
+      renderTracks();
+      bindStartHandlers();
+    } catch (e) {
+      alert(e?.message || 'Could not save consent. Please try again.');
+      openConsent();
+    } finally {
+      consentAgreeBtn.disabled = false;
+    }
+  });
+
+  document.getElementById('y').textContent = new Date().getFullYear();
+
+  boot();
+</script>
 </body>
 </html>

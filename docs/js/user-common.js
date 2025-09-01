@@ -5,7 +5,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 /* -------------------------------------------------------
- * Config / Client
+ * Config / Client87
  * ----------------------------------------------------- */
 
 export const EVENT_TZ = 'America/Phoenix' // conference local time
@@ -16,7 +16,9 @@ export const MAX_DAYS   = 4;
 export function supaFromConfig() {
   const { SUPABASE_URL, SUPABASE_KEY } = window.__ENV || {}
   if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Missing Supabase config')
-  return createClient(SUPABASE_URL, SUPABASE_KEY)
+  return createClient(SUPABASE_URL, SUPABASE_KEY, { 
+    auth: { persistSession: true, autoRefresh: true, detectSessionInUrl: true } 
+  })
 }
 
 export function redirectBaseNoHash() {
@@ -46,21 +48,31 @@ export function todayStrAZ() {
  * Auth / Profile / Gate
  * ----------------------------------------------------- */
 
-export async function sendMagicLink(supabase, email, redirectTo = redirectBaseNoHash()) {
+export async function requestEmailCode(supabase, email) {
   if (!email) return { ok: false, error: 'Email required' }
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: redirectTo }
+    options: { shouldCreateUser: true }
   })
   if (error) return { ok: false, error: error.message }
   return { ok: true }
+}
+
+export async function verifyEmailCode(supabase, email, code) {
+  if (!email || !code) return { ok: false, error: 'Email + code required' }
+  const { data, error } = await supabase.auth.verifyOtp({
+    email,
+    token: code,
+    type: 'email',
+  })
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, session: data?.session || null }
 }
 
 export async function signOut(supabase) {
   await supabase.auth.signOut()
 }
 
-/** Ensure a profile row for current user; return { user, profile } */
 export async function ensureProfile(supabase) {
   const { data: { user }, error: uErr } = await supabase.auth.getUser()
   if (uErr) throw uErr
@@ -103,16 +115,9 @@ export async function gateCheck(supabase) {
 }
 
 /** Require: signed in + consented + registration approved, else redirect */
-export async function requireApprovedOrRedirect(supabase, { redirectTo = './access.html' } = {}) {
+export async function requireSignedInOrRedirect(supabase, { redirectTo = './access.html' } = {}) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) { window.location.replace(redirectTo); return { redirected: true } }
-
-  const { data: prof } = await supabase.from('profiles').select('consent').eq('id', user.id).maybeSingle()
-  if (!prof?.consent) { window.location.replace(redirectTo); return { redirected: true } }
-
-  const { data: reg } = await supabase.from('registrations').select('status').eq('email', user.email).maybeSingle()
-  if (reg?.status !== 'approved') { window.location.replace(redirectTo); return { redirected: true } }
-
   return { redirected: false }
 }
 
@@ -125,34 +130,15 @@ export async function agreeConsent(supabase) {
 }
 
 /* -------------------------------------------------------
- * Classic “25 tile” fallback board (optional)
- * ----------------------------------------------------- */
-
-const LEVEL_TARGETS_25 = { 1: 13, 2: 9, 3: 3, 4: 0 }
-
-/* -------------------------------------------------------
  * Track-per-day boards (4 + 1 bonus)
  * ----------------------------------------------------- */
 
-/** Get all boards for the user */
-export async function getUserBoards(supabase, userId, dayDate) {
-  const { data, error } = await supabase
-    .from('quest_boards')
-    .select('id, track, day_no, created_at')
-    .eq('user_id', userId)
-  if (error) throw error
-
-  if (!data) {
-
-  }
-  return data || []
-}
 
 /** Recent boards for history */
 export async function listRecentBoards(supabase, userId) {
   const { data, error } = await supabase
     .from('quest_boards')
-    .select('id, track, day_no, created_at')
+    .select('id, track, created_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -253,6 +239,15 @@ export async function getBoardItems(supabase, boardId) {
     .from('board_items')
     .select('id, proof_url, verified, is_bonus, questions(text, level, category, active)')
     .eq('board_id', boardId)
+  if (error) throw error
+  return data || []
+}
+
+export async function getUserBoardsWithComputedStatus(supabase, userId) {
+  const { data, error } = await supabase
+    .from('v_board_status')
+    .select('id, track, created_at, computed_status')
+    .eq('user_id', userId)
   if (error) throw error
   return data || []
 }

@@ -13,9 +13,8 @@
   <main class="max-w-md mx-auto p-4 sm:p-6 mt-4">
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
       <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Access My Board</h2>
-      <p class="text-gray-600 dark:text-gray-400 text-sm mb-6">Enter your name and email to get a sign-in link.  Returning users only need their email.</p>
+      <p class="text-gray-600 dark:text-gray-400 text-sm mb-6">Enter your email to get a 6-digit code.</p>
 
-      <!-- Combined form -->
       <form id="form" class="space-y-4">
         <div id="nameFields">
           <label class="block text-sm font-bold mb-1">First name</label>
@@ -23,9 +22,24 @@
           <label class="block text-sm font-bold mt-4 mb-1">Last name</label>
           <input name="last" class="w-full rounded-xl border p-3 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
         </div>
+
         <label class="block text-sm font-bold mb-1">Email</label>
-        <input name="email" id="email" type="email" required autocomplete="email" class="w-full rounded-xl border p-3 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-        <button id="sendBtn" type="submit" class="w-full rounded-xl bg-gray-900 dark:bg-gray-700 text-white py-3 font-bold">Email me a sign‑in link</button>
+        <input name="email" id="email" type="email" required autocomplete="email"
+              class="w-full rounded-xl border p-3 dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+
+        <div id="codeWrap" class="hidden">
+          <label class="block text-sm font-bold mb-1">Verification code</label>
+          <input name="code" id="code" inputmode="numeric" pattern="[0-9]*" maxlength="6"
+                class="w-full rounded-xl border p-3 tracking-widest text-center dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+        </div>
+
+        <button id="primaryBtn" type="submit"
+                class="w-full rounded-xl bg-gray-900 dark:bg-gray-700 text-white py-3 font-bold">Send code</button>
+
+        <button id="resendBtn" type="button"
+                class="w-full rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200 py-3 font-bold hidden">
+          Resend code
+        </button>
       </form>
 
       <div class="mt-4">
@@ -33,30 +47,16 @@
         <p id="state" class="text-sm text-gray-800 dark:text-gray-200 mt-2"></p>
       </div>
     </div>
-
-    <!-- Consent modal -->
-    <div id="consentWrap" class="hidden fixed inset-0 bg-black/40 grid place-items-center p-4 z-50">
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 max-w-lg w-full">
-        <h2 class="text-xl font-bold mb-3">Media Consent</h2>
-        <p class="text-sm text-gray-700 dark:text-gray-300">I agree that TCA may use photos/videos I submit for media purposes as described in the Terms.</p>
-        <div class="mt-6 flex flex-wrap gap-3">
-          <button id="agreeBtn" class="px-5 py-2.5 rounded-lg bg-gray-900 dark:bg-gray-700 text-white font-bold">I Agree</button>
-          <a href="./TERMS.html" class="px-5 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200">Read Terms</a>
-          <a href="./PRIVACY.html" class="px-5 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-200">Privacy</a>
-        </div>
-      </div>
-    </div>
   </main>
 
   <script type="module">
     import { renderHeader, initHeader } from './js/header.js';
     import {
-      supaFromConfig, sendMagicLink, gateCheck, agreeConsent, redirectBaseNoHash,
-      ensureProfile
+      supaFromConfig, ensureProfile, requestEmailCode, verifyEmailCode, redirectBaseNoHash
     } from './js/user-common.js';
 
     document.getElementById('siteHeader').outerHTML = renderHeader({
-      admin: false, nav: [['Home','./index.html']], withAuth: false
+      admin:false, nav:[['Home','./index.html']], withAuth:false
     });
     initHeader();
 
@@ -64,123 +64,111 @@
     const form       = document.getElementById('form');
     const msg        = document.getElementById('msg');
     const state      = document.getElementById('state');
-    const sendBtn    = document.getElementById('sendBtn');
-    const emailInput = document.querySelector('input[name="email"]');
+    const primaryBtn = document.getElementById('primaryBtn');
+    const resendBtn  = document.getElementById('resendBtn');
+    const codeWrap   = document.getElementById('codeWrap');
+    const emailEl    = document.getElementById('email');
+    const codeEl     = document.getElementById('code');
     const nameFields = document.getElementById('nameFields');
-    const consentWrap= document.getElementById('consentWrap');
-    const agreeBtn   = document.getElementById('agreeBtn');
 
-    let sending = false, cooldownTimer = null;
+    let stage = 'send'; // 'send' | 'verify'
+    let sending = false;
     const COOLDOWN_SEC = 60;
-    function startCooldown(){
-      let remain = COOLDOWN_SEC;
-      sendBtn.disabled = true;
-      sendBtn.classList.add('opacity-50','cursor-not-allowed');
-      const orig = 'Email me a sign-in link';
-      sendBtn.textContent = `Resend in ${remain}s`;
-      cooldownTimer = setInterval(()=>{
-        remain -= 1;
-        if(remain<=0){
-          clearInterval(cooldownTimer);
-          sendBtn.disabled = false;
-          sendBtn.classList.remove('opacity-50','cursor-not-allowed');
-          sendBtn.textContent = orig;
-        } else { sendBtn.textContent = `Resend in ${remain}s`; }
-      },1000);
+    let cooldownTimer = null;
+
+    // Hide name fields if we’ve seen a name before
+    (() => { const prev = localStorage.getItem('tq_name'); if (prev) nameFields.classList.add('hidden'); })();
+
+    function setStage(next) {
+      stage = next;
+      if (stage === 'send') {
+        codeWrap.classList.add('hidden');
+        primaryBtn.textContent = 'Send code';
+        resendBtn.classList.add('hidden');
+      } else {
+        codeWrap.classList.remove('hidden');
+        primaryBtn.textContent = 'Verify code';
+        resendBtn.classList.remove('hidden');
+        codeEl?.focus();
+      }
     }
 
-    // Hide name fields if we’ve seen a name before (same behavior you had)
-    (() => {
-      const prev = localStorage.getItem('tq_name');
-      if (prev) nameFields.classList.add('hidden');
-    })();
+    function startCooldown(){
+      let remain = COOLDOWN_SEC;
+      resendBtn.disabled = true;
+      const baseTxt = 'Resend code';
+      resendBtn.textContent = `${baseTxt} (${remain}s)`;
+      cooldownTimer = setInterval(()=>{
+        remain -= 1;
+        if (remain <= 0) {
+          clearInterval(cooldownTimer);
+          resendBtn.disabled = false;
+          resendBtn.textContent = baseTxt;
+        } else {
+          resendBtn.textContent = `${baseTxt} (${remain}s)`;
+        }
+      }, 1000);
+    }
 
+    // Send / Verify handler
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const email = emailInput.value.trim().toLowerCase();
+      if (sending) return;
+      const email = emailEl.value.trim().toLowerCase();
       const first = e.target.first?.value?.trim() || '';
       const last  = e.target.last?.value?.trim() || '';
-      if (!email) return;
+      if (!email) { msg.textContent = 'Email required.'; return; }
 
+      // Save draft name (for registration later)
       if (first && last) {
         localStorage.setItem('tq_name', JSON.stringify({ first, last }));
         localStorage.setItem(`tq_reg:${email}`, JSON.stringify({ first, last }));
       }
 
-      if (sending) return;
-      sending = true;
-      const redirectTo = redirectBaseNoHash(); // returns to access.html
-      const { ok, error } = await sendMagicLink(supabase, email, redirectTo);
-      sending = false;
-      if (!ok) { msg.textContent = 'Error: ' + error; return; }
-      msg.textContent = 'Check your email for the sign-in link.';
-      state.textContent = '';
-      startCooldown();
-    });
-
-    async function afterLogin(){
-      // Ensure session and profile row exist BEFORE checking consent
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Upsert/ensure a profiles row (prevents consent write failures)
-      await ensureProfile(supabase);
-
-      // Evaluate gates
-      let { needsConsent, approved, regStatus } = await gateCheck(supabase);
-
-      // If no registration yet and not approved, create one from draft
-      if (!regStatus && !approved) {
-        const draftKey = `tq_reg:${(user.email || '').toLowerCase()}`;
-        let draft = null;
-        try { draft = JSON.parse(localStorage.getItem(draftKey) || 'null'); } catch {}
-        const payload = { email: user.email, first_name: draft?.first || null, last_name: draft?.last || null, status: 'pending' };
-        const { error: rErr } = await supabase.from('registrations').insert(payload);
-        if (!rErr) state.textContent = 'Pending approval. Please check back later.';
-        localStorage.removeItem(draftKey);
-      }
-
-      // Consent: only show AFTER we know we have a user+profile
-      if (needsConsent) {
-        consentWrap.classList.remove('hidden');
-        return;
-      }
-
-      // No consent needed: if approved go to board; else show status
-      if (approved) {
-        window.location.replace('./tracks.html');
-        return;
-      }
-      state.textContent = (regStatus === 'rejected')
-        ? 'Your request was not approved.'
-        : 'Please wait a moment while we process your registration.';
-    }
-
-    // Save consent, hide modal, re-run the gate
-    agreeBtn.addEventListener('click', async () => {
-      agreeBtn.disabled = true;
       try {
-        await agreeConsent(supabase);            // writes profiles.consent = true for auth.uid
-        consentWrap.classList.add('hidden');     // hide immediately
-        // Re-evaluate gates to decide next step
-        const { needsConsent, approved, regStatus } = await gateCheck(supabase);
-        if (!needsConsent && approved) {
+        sending = true;
+        msg.textContent = ''; state.textContent = '';
+
+        if (stage === 'send') {
+          const { ok, error } = await requestEmailCode(supabase, email);
+          if (!ok) throw new Error(error || 'Unable to send code.');
+          setStage('verify');
+          startCooldown();
+          msg.textContent = 'We sent you a 6-digit code. Check your email.';
+        } else {
+          const code = codeEl.value.trim();
+          if (code.length < 6) { msg.textContent = 'Enter the 6-digit code.'; sending = false; return; }
+          const { ok, error } = await verifyEmailCode(supabase, email, code);
+          if (!ok) throw new Error(error || 'Invalid code.');
+          // ensure profile then go to tracks
+          await ensureProfile(supabase);
           window.location.replace('./tracks.html');
-        } else if (!needsConsent && !approved) {
-          state.textContent = (regStatus === 'rejected')
-            ? 'Your request was not approved.'
-            : 'Please wait a moment while we process your registration.';
         }
-      } catch (e) {
-        alert(e?.message || 'Could not save consent. Please try again.');
+      } catch (err) {
+        msg.textContent = err?.message || 'Something went wrong.';
       } finally {
-        agreeBtn.disabled = false;
+        sending = false;
       }
     });
 
-    // Auth lifecycle
-    supabase.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN') afterLogin(); });
-    supabase.auth.getUser().then(({data:{user}}) => { if (user) afterLogin(); });
+    // Resend code with cooldown
+    resendBtn.addEventListener('click', async () => {
+      const email = emailEl.value.trim().toLowerCase();
+      if (!email || resendBtn.disabled) return;
+      const { ok, error } = await requestEmailCode(supabase, email);
+      if (!ok) { msg.textContent = 'Error: ' + error; return; }
+      startCooldown();
+      msg.textContent = 'Code resent.';
+    });
+
+    // If already signed in (e.g., returned visit), skip to tracks
+    (async () => {
+      const { data:{ session } } = await supabase.auth.getSession();
+      if (session) {
+        await ensureProfile(supabase);
+        window.location.replace('./tracks.html');
+      }
+    })();
   </script>
 </body>
 </html>
