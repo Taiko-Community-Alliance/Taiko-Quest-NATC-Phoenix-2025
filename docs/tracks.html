@@ -110,7 +110,6 @@
     user: null,
     needsConsent: false,
     approved: false,
-    regStatus: null,
     dayOffset: 0,
     conferenceEnded: false,
     canOpenMoreToday: true, // based on boards status
@@ -169,11 +168,10 @@
     const { user } = await ensureProfile(supabase);
     state.user = user;
 
-    const { needsConsent, approved, regStatus } = await gateCheck(supabase);
+    const { needsConsent, approved } = await gateCheck(supabase);
 
     state.needsConsent = needsConsent;
     state.approved = approved;
-    state.regStatus = regStatus;
   }
 
   async function hydrateBoardsState() {
@@ -298,7 +296,6 @@
     const g = await gateCheck(supabase);
     state.needsConsent = g.needsConsent;
     state.approved     = g.approved;
-    state.regStatus    = g.regStatus;
   }
 
   consentAgreeBtn.addEventListener('click', async () => {

@@ -94,7 +94,7 @@ export async function ensureProfile(supabase) {
 /** Access-page gate: checks consent + registration approval (via registrations.status) */
 export async function gateCheck(supabase) {
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { user: null, profile: null, needsConsent: false, approved: false, regStatus: null }
+  if (!user) return { user: null, profile: null, needsConsent: false, approved: false }
 
   // Ensure profile exists on first sign-in
   await supabase.from('profiles').upsert(
@@ -103,15 +103,11 @@ export async function gateCheck(supabase) {
   )
 
   const { data: profile } = await supabase
-    .from('profiles').select('consent').eq('id', user.id).maybeSingle()
+    .from('profiles').select('consent', 'approved') .eq('id', user.id).maybeSingle()
   const needsConsent = !profile?.consent
+  const approved = !profile?.approved
 
-  const { data: reg } = await supabase
-    .from('registrations').select('status').eq('email', user.email).maybeSingle()
-  const regStatus = reg?.status || null
-  const approved = regStatus === 'approved'
-
-  return { user, profile, needsConsent, approved, regStatus }
+  return { user, profile, needsConsent, approved }
 }
 
 /** Require: signed in + consented + registration approved, else redirect */
