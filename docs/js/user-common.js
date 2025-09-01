@@ -5,7 +5,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 /* -------------------------------------------------------
- * Config / Client
+ * Config / Client87
  * ----------------------------------------------------- */
 
 export const EVENT_TZ = 'America/Phoenix' // conference local time
@@ -16,7 +16,9 @@ export const MAX_DAYS   = 4;
 export function supaFromConfig() {
   const { SUPABASE_URL, SUPABASE_KEY } = window.__ENV || {}
   if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Missing Supabase config')
-  return createClient(SUPABASE_URL, SUPABASE_KEY)
+  return createClient(SUPABASE_URL, SUPABASE_KEY, { 
+    auth: { persistSession: true, autoRefresh: true, detectSessionInUrl: true } 
+  })
 }
 
 export function redirectBaseNoHash() {
@@ -46,21 +48,31 @@ export function todayStrAZ() {
  * Auth / Profile / Gate
  * ----------------------------------------------------- */
 
-export async function sendMagicLink(supabase, email, redirectTo = redirectBaseNoHash()) {
+export async function requestEmailCode(supabase, email) {
   if (!email) return { ok: false, error: 'Email required' }
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: redirectTo }
+    options: { shouldCreateUser: true }
   })
   if (error) return { ok: false, error: error.message }
   return { ok: true }
+}
+
+export async function verifyEmailCode(supabase, email, code) {
+  if (!email || !code) return { ok: false, error: 'Email + code required' }
+  const { data, error } = await supabase.auth.verifyOtp({
+    email,
+    token: code,
+    type: 'email',
+  })
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, session: data?.session || null }
 }
 
 export async function signOut(supabase) {
   await supabase.auth.signOut()
 }
 
-/** Ensure a profile row for current user; return { user, profile } */
 export async function ensureProfile(supabase) {
   const { data: { user }, error: uErr } = await supabase.auth.getUser()
   if (uErr) throw uErr
@@ -103,16 +115,9 @@ export async function gateCheck(supabase) {
 }
 
 /** Require: signed in + consented + registration approved, else redirect */
-export async function requireApprovedOrRedirect(supabase, { redirectTo = './access.html' } = {}) {
+export async function requireSignedInOrRedirect(supabase, { redirectTo = './access.html' } = {}) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) { window.location.replace(redirectTo); return { redirected: true } }
-
-  const { data: prof } = await supabase.from('profiles').select('consent').eq('id', user.id).maybeSingle()
-  if (!prof?.consent) { window.location.replace(redirectTo); return { redirected: true } }
-
-  const { data: reg } = await supabase.from('registrations').select('status').eq('email', user.email).maybeSingle()
-  if (reg?.status !== 'approved') { window.location.replace(redirectTo); return { redirected: true } }
-
   return { redirected: false }
 }
 
@@ -138,7 +143,7 @@ const LEVEL_TARGETS_25 = { 1: 13, 2: 9, 3: 3, 4: 0 }
 export async function getUserBoards(supabase, userId, dayDate) {
   const { data, error } = await supabase
     .from('quest_boards')
-    .select('id, track, day_no, created_at')
+    .select('id, track, day_no, status, created_at')
     .eq('user_id', userId)
   if (error) throw error
 

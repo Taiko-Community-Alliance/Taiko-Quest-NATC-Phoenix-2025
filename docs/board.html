@@ -55,7 +55,7 @@
   <script type="module">
     import { renderHeader, initHeader, bindAuthHeader } from './js/header.js';
     import {
-      supaFromConfig, requireApprovedOrRedirect, ensureProfile,
+      supaFromConfig, requireSignedInOrRedirect, ensureProfile,
       getBoardItems, uploadProof, agreeConsent
     } from './js/user-common.js';
 
@@ -83,7 +83,7 @@
       const subtitle    = document.getElementById('subtitle');
 
       // Require approved profile
-      const guard = await requireApprovedOrRedirect(supabase, { redirectTo: './access.html' });
+      const guard = await requireSignedInOrRedirect(supabase, { redirectTo: './access.html' });
       if (guard.redirected) return;
       const { user, profile } = await ensureProfile(supabase);
       // Consent check
