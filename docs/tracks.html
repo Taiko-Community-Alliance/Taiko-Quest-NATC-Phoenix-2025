@@ -157,7 +157,7 @@
     const dayOffset  = Math.floor((midnight - CONF_START) / (24 * 60 * 60 * 1000)) + 1;
 
     state.dayOffset = dayOffset;
-    state.conferenceEnded = (dayOffset > MAX_DAYS);
+    state.conferenceEnded = (dayOffset > MAX_DAYS) || true; // to allow late submissions
 
     if (dayOffset >= 0) dayLabel.textContent = `Day ${dayOffset}`;
     else                dayLabel.textContent = `D-${Math.abs(dayOffset)}`;
