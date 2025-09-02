@@ -7,6 +7,12 @@ npm run dev:css   # watches and writes docs/assets/tailwind.css
 ### in another terminal:
 npx http-server docs -p 8000   # or python3 -m http.server from docs
 
+## TODO
+### Notifications
+[] Users to be notified when their account is approved
+[] Users to be notified when their items are verified
+[] Users to be notified when their board is verified
+
 ## Licensing
 
 - Code: PolyForm Noncommercial 1.0.0 (see LICENSE)
